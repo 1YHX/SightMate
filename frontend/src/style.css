@@ -41,7 +41,8 @@ button:disabled {
 .app-header,
 .camera-panel,
 .voice-panel,
-.capture-panel {
+.capture-panel,
+.history-panel {
   width: min(1040px, 100%);
   margin: 0 auto;
 }
@@ -55,7 +56,8 @@ button:disabled {
 
 .camera-panel,
 .voice-panel,
-.capture-panel {
+.capture-panel,
+.history-panel {
   padding: 24px;
   border: 1px solid #d9e1ee;
   border-radius: 8px;
@@ -231,6 +233,58 @@ h2 {
   font-weight: 700;
 }
 
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #d9e1ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.history-item img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #111827;
+}
+
+.history-content {
+  min-width: 0;
+}
+
+.history-question,
+.history-answer {
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+
+.history-question {
+  color: #18202f;
+  font-weight: 700;
+}
+
+.history-answer {
+  color: #49566b;
+}
+
+.compact-button {
+  min-width: auto;
+  min-height: 36px;
+  padding: 0 14px;
+}
+
 .camera-actions {
   display: flex;
   gap: 12px;
@@ -283,8 +337,13 @@ h2 {
 
   .camera-panel,
   .voice-panel,
-  .capture-panel {
+  .capture-panel,
+  .history-panel {
     padding: 18px;
+  }
+
+  .history-item {
+    grid-template-columns: 1fr;
   }
 
   .primary-button,

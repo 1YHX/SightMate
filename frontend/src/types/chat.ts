@@ -16,3 +16,12 @@ export type VisionChatResponse = {
   model: string
   created_at: string
 }
+
+export type ChatHistoryItem = {
+  id: string
+  question: string
+  answer: string
+  image_base64: string
+  model: string
+  created_at: string
+}

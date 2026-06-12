@@ -2,9 +2,15 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
+import HistoryList from './components/HistoryList.vue'
 import VoiceInput from './components/VoiceInput.vue'
-import type { VisionChatResponse } from './types/chat'
+import type { ChatHistoryMessage, ChatHistoryItem, VisionChatResponse } from './types/chat'
 import { isSpeechSynthesisSupported, speakText, stopSpeaking } from './utils/speech'
+import {
+  clearChatHistory,
+  loadChatHistory,
+  prependChatHistoryItem
+} from './utils/storage'
 
 const projectName = 'SightMate'
 const question = ref('')
@@ -17,6 +23,7 @@ const latestAnswer = ref<VisionChatResponse | null>(null)
 const isSpeaking = ref(false)
 const speechError = ref('')
 const canSpeak = isSpeechSynthesisSupported()
+const chatHistory = ref<ChatHistoryItem[]>(loadChatHistory())
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 
@@ -52,7 +59,15 @@ async function submitQuestion() {
     latestAnswer.value = await chatWithVision({
       question: question.value.trim(),
       image_base64: imageBase64,
-      history: []
+      history: buildRecentContext()
+    })
+    chatHistory.value = prependChatHistoryItem(chatHistory.value, {
+      id: crypto.randomUUID(),
+      question: question.value.trim(),
+      answer: latestAnswer.value.answer,
+      image_base64: imageBase64,
+      model: latestAnswer.value.model,
+      created_at: latestAnswer.value.created_at
     })
     playLatestAnswer()
   } catch (error) {
@@ -60,6 +75,22 @@ async function submitQuestion() {
   } finally {
     isSubmitting.value = false
   }
+}
+
+function buildRecentContext(): ChatHistoryMessage[] {
+  return chatHistory.value
+    .slice(0, 3)
+    .reverse()
+    .flatMap((item) => [
+      {
+        role: 'user' as const,
+        content: item.question
+      },
+      {
+        role: 'assistant' as const,
+        content: item.answer
+      }
+    ])
 }
 
 function playLatestAnswer() {
@@ -91,6 +122,11 @@ function playLatestAnswer() {
 function stopAnswerSpeech() {
   stopSpeaking()
   isSpeaking.value = false
+}
+
+function clearHistory() {
+  clearChatHistory()
+  chatHistory.value = []
 }
 
 onBeforeUnmount(() => {
@@ -187,5 +223,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </section>
+
+    <HistoryList :items="chatHistory" @clear="clearHistory" />
   </main>
 </template>
