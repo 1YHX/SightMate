@@ -93,7 +93,7 @@ defineExpose({
 </script>
 
 <template>
-  <section class="camera-panel" aria-labelledby="camera-title">
+  <section class="camera-panel tool-panel" aria-labelledby="camera-title">
     <div class="panel-header">
       <div>
         <p class="eyebrow">实时画面</p>
@@ -104,7 +104,7 @@ defineExpose({
       </div>
     </div>
 
-    <div class="video-frame">
+    <div class="video-frame live-video-frame">
       <video
         v-show="isCameraActive"
         ref="videoRef"

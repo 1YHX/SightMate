@@ -11,7 +11,7 @@ defineEmits<{
 </script>
 
 <template>
-  <section class="history-panel" aria-labelledby="history-title">
+  <section class="history-panel tool-panel" aria-labelledby="history-title">
     <div class="panel-header">
       <div>
         <p class="eyebrow">历史记录</p>

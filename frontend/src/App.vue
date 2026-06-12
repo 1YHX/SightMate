@@ -26,6 +26,7 @@ const canSpeak = isSpeechSynthesisSupported()
 const chatHistory = ref<ChatHistoryItem[]>(loadChatHistory())
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
+const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
 
 function captureCurrentFrame() {
   captureError.value = ''
@@ -146,82 +147,84 @@ onBeforeUnmount(() => {
       </p>
     </header>
 
-    <CameraView ref="cameraViewRef" />
-    <VoiceInput v-model="question" />
-
-    <section class="capture-panel" aria-labelledby="capture-title">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">当前帧</p>
-          <h2 id="capture-title">提问截图</h2>
-        </div>
-        <div class="camera-status" :class="{ active: capturedImage }">
-          {{ capturedImage ? '已截取' : '未截取' }}
-        </div>
+    <section class="workspace" aria-label="视觉对话工作区">
+      <div class="video-column">
+        <CameraView ref="cameraViewRef" />
       </div>
 
-      <p class="hint-message">发送问题时会自动截取当前画面，也可以先手动截图预览。</p>
-
-      <p v-if="captureError" class="error-message" role="alert">
-        {{ captureError }}
-      </p>
-      <p v-if="chatError" class="error-message" role="alert">
-        {{ chatError }}
-      </p>
-      <p v-if="speechError" class="error-message" role="alert">
-        {{ speechError }}
-      </p>
-      <p v-if="!canSpeak" class="hint-message">当前浏览器不支持语音播报，请阅读文字回答。</p>
-
-      <div v-if="capturedImage" class="capture-preview">
-        <img :src="capturedImage" alt="当前摄像头截图预览" />
-      </div>
-
-      <div class="camera-actions">
-        <button
-          class="primary-button"
-          type="button"
-          :disabled="!canSubmit"
-          @click="submitQuestion"
-        >
-          {{ isSubmitting ? '正在发送...' : '发送问题' }}
-        </button>
-        <button
-          class="secondary-button"
-          type="button"
-          :disabled="isSubmitting"
-          @click="captureCurrentFrame"
-        >
-          截取当前画面
-        </button>
-      </div>
-
-      <div v-if="latestAnswer" class="answer-panel">
-        <div class="answer-meta">
-          <span>{{ latestAnswer.model }}</span>
-          <span>{{ latestAnswer.created_at }}</span>
-          <span>{{ isSpeaking ? '正在播报' : '播报就绪' }}</span>
+      <section class="chat-panel tool-panel" aria-labelledby="chat-title">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">对话</p>
+            <h2 id="chat-title">当前视觉问答</h2>
+          </div>
+          <div class="camera-status" :class="{ active: latestAnswer }">
+            {{ latestAnswer ? '已回答' : '待提问' }}
+          </div>
         </div>
-        <p>{{ latestAnswer.answer }}</p>
-        <div class="camera-actions">
+
+        <div v-if="visibleError" class="error-stack" role="alert">
+          <p v-if="captureError" class="error-message">{{ captureError }}</p>
+          <p v-if="chatError" class="error-message">{{ chatError }}</p>
+          <p v-if="speechError" class="error-message">{{ speechError }}</p>
+        </div>
+
+        <p v-if="!canSpeak" class="hint-message">当前浏览器不支持语音播报，请阅读文字回答。</p>
+
+        <div v-if="capturedImage" class="capture-preview compact-preview">
+          <img :src="capturedImage" alt="本次提问截图预览" />
+        </div>
+
+        <div v-if="latestAnswer" class="answer-panel">
+          <div class="answer-meta">
+            <span>{{ latestAnswer.model }}</span>
+            <span>{{ latestAnswer.created_at }}</span>
+            <span>{{ isSpeaking ? '正在播报' : '播报就绪' }}</span>
+          </div>
+          <p>{{ latestAnswer.answer }}</p>
+          <div class="camera-actions">
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="!canSpeak || isSpeaking"
+              @click="playLatestAnswer"
+            >
+              重新播放
+            </button>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="!isSpeaking"
+              @click="stopAnswerSpeech"
+            >
+              停止播报
+            </button>
+          </div>
+        </div>
+
+        <p v-else class="empty-answer">打开摄像头后，用语音或文字提问，SightMate 会在发送时截取当前画面。</p>
+
+        <VoiceInput v-model="question" />
+
+        <div class="submit-bar">
           <button
-            class="secondary-button"
+            class="primary-button"
             type="button"
-            :disabled="!canSpeak || isSpeaking"
-            @click="playLatestAnswer"
+            :disabled="!canSubmit"
+            @click="submitQuestion"
           >
-            重新播放
+            {{ isSubmitting ? '正在分析...' : '发送并分析当前画面' }}
           </button>
           <button
             class="secondary-button"
             type="button"
-            :disabled="!isSpeaking"
-            @click="stopAnswerSpeech"
+            :disabled="isSubmitting"
+            @click="captureCurrentFrame"
           >
-            停止播报
+            预览截图
           </button>
         </div>
-      </div>
+      </section>
     </section>
 
     <HistoryList :items="chatHistory" @clear="clearHistory" />

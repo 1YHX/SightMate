@@ -103,7 +103,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="voice-panel" aria-labelledby="voice-title">
+  <section class="voice-panel tool-panel" aria-labelledby="voice-title">
     <div class="panel-header">
       <div>
         <p class="eyebrow">语音提问</p>
