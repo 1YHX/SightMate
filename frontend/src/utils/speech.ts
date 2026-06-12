@@ -102,7 +102,7 @@ export function speakText(
 
   window.speechSynthesis.cancel()
 
-  const utterance = new SpeechSynthesisUtterance(text)
+  const utterance = new SpeechSynthesisUtterance(toSpeakableText(text))
   utterance.lang = options.lang ?? 'zh-CN'
   utterance.rate = 1.08
   utterance.pitch = 1.12
@@ -121,6 +121,23 @@ export function speakText(
   }
 
   window.speechSynthesis.speak(utterance)
+}
+
+function toSpeakableText(text: string) {
+  return text
+    .replace(/```[\s\S]*?```/g, '代码内容已省略。')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[>#|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function findLivelyChineseVoice() {

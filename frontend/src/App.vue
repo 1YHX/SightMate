@@ -36,6 +36,8 @@ const chatHistory = ref<ChatHistoryItem[]>(loadChatHistory())
 const isConversationMode = ref(false)
 const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
 const conversationStatus = ref('未开启')
+const pendingTranscript = ref('')
+let autoSubmitTimer: number | undefined
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
@@ -165,6 +167,8 @@ function startConversationMode() {
 function stopConversationMode() {
   isConversationMode.value = false
   conversationStatus.value = '未开启'
+  pendingTranscript.value = ''
+  clearAutoSubmitTimer()
   conversationRecognition.value?.abort()
   conversationRecognition.value = null
 }
@@ -216,6 +220,7 @@ function startConversationRecognition() {
 
   recognition.onresult = (event) => {
     let finalText = ''
+    let interimText = ''
 
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
       const result = event.results[index]
@@ -223,17 +228,28 @@ function startConversationRecognition() {
 
       if (result.isFinal) {
         finalText += transcript
+      } else {
+        interimText += transcript
       }
     }
 
-    if (!finalText || isSubmitting.value) {
+    const nextTranscript = (finalText || interimText).trim()
+
+    if (!nextTranscript || isSubmitting.value) {
       return
     }
 
-    question.value = finalText
-    conversationStatus.value = '正在分析'
-    conversationRecognition.value?.stop()
-    void submitQuestion(finalText)
+    question.value = nextTranscript
+    pendingTranscript.value = nextTranscript
+
+    if (finalText) {
+      submitPendingConversationQuestion()
+      return
+    }
+
+    conversationStatus.value = '听到问题，等待你说完'
+    clearAutoSubmitTimer()
+    autoSubmitTimer = window.setTimeout(submitPendingConversationQuestion, 1200)
   }
 
   try {
@@ -242,6 +258,28 @@ function startConversationRecognition() {
     conversationRecognition.value = null
     chatError.value = '连续语音识别启动失败，请重新开启。'
     stopConversationMode()
+  }
+}
+
+function submitPendingConversationQuestion() {
+  const nextQuestion = pendingTranscript.value.trim()
+
+  if (!nextQuestion || isSubmitting.value) {
+    return
+  }
+
+  clearAutoSubmitTimer()
+  pendingTranscript.value = ''
+  question.value = nextQuestion
+  conversationStatus.value = '正在分析'
+  conversationRecognition.value?.stop()
+  void submitQuestion(nextQuestion)
+}
+
+function clearAutoSubmitTimer() {
+  if (autoSubmitTimer) {
+    window.clearTimeout(autoSubmitTimer)
+    autoSubmitTimer = undefined
   }
 }
 
@@ -254,6 +292,7 @@ function resumeConversationIfNeeded() {
 
 onBeforeUnmount(() => {
   stopConversationMode()
+  clearAutoSubmitTimer()
   stopSpeaking()
 })
 </script>
