@@ -76,3 +76,48 @@ export function getSpeechErrorMessage(error: string) {
       return '语音识别失败，请重试，或直接使用文字输入。'
   }
 }
+
+export function isSpeechSynthesisSupported() {
+  return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
+}
+
+export function speakText(
+  text: string,
+  options: {
+    lang?: string
+    onStart?: () => void
+    onEnd?: () => void
+    onError?: () => void
+  } = {}
+) {
+  if (!isSpeechSynthesisSupported()) {
+    throw new Error('当前浏览器不支持语音播报。')
+  }
+
+  window.speechSynthesis.cancel()
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = options.lang ?? 'zh-CN'
+  utterance.rate = 1
+  utterance.pitch = 1
+
+  utterance.onstart = () => {
+    options.onStart?.()
+  }
+
+  utterance.onend = () => {
+    options.onEnd?.()
+  }
+
+  utterance.onerror = () => {
+    options.onError?.()
+  }
+
+  window.speechSynthesis.speak(utterance)
+}
+
+export function stopSpeaking() {
+  if (isSpeechSynthesisSupported()) {
+    window.speechSynthesis.cancel()
+  }
+}

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
 import VoiceInput from './components/VoiceInput.vue'
 import type { VisionChatResponse } from './types/chat'
+import { isSpeechSynthesisSupported, speakText, stopSpeaking } from './utils/speech'
 
 const projectName = 'SightMate'
 const question = ref('')
@@ -13,6 +14,9 @@ const captureError = ref('')
 const chatError = ref('')
 const isSubmitting = ref(false)
 const latestAnswer = ref<VisionChatResponse | null>(null)
+const isSpeaking = ref(false)
+const speechError = ref('')
+const canSpeak = isSpeechSynthesisSupported()
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 
@@ -50,12 +54,48 @@ async function submitQuestion() {
       image_base64: imageBase64,
       history: []
     })
+    playLatestAnswer()
   } catch (error) {
     chatError.value = error instanceof Error ? error.message : '请求失败，请稍后重试。'
   } finally {
     isSubmitting.value = false
   }
 }
+
+function playLatestAnswer() {
+  if (!latestAnswer.value) {
+    return
+  }
+
+  speechError.value = ''
+
+  try {
+    speakText(latestAnswer.value.answer, {
+      onStart: () => {
+        isSpeaking.value = true
+      },
+      onEnd: () => {
+        isSpeaking.value = false
+      },
+      onError: () => {
+        isSpeaking.value = false
+        speechError.value = '语音播报失败，请使用文字回答。'
+      }
+    })
+  } catch (error) {
+    isSpeaking.value = false
+    speechError.value = error instanceof Error ? error.message : '语音播报失败，请使用文字回答。'
+  }
+}
+
+function stopAnswerSpeech() {
+  stopSpeaking()
+  isSpeaking.value = false
+}
+
+onBeforeUnmount(() => {
+  stopSpeaking()
+})
 </script>
 
 <template>
@@ -92,6 +132,10 @@ async function submitQuestion() {
       <p v-if="chatError" class="error-message" role="alert">
         {{ chatError }}
       </p>
+      <p v-if="speechError" class="error-message" role="alert">
+        {{ speechError }}
+      </p>
+      <p v-if="!canSpeak" class="hint-message">当前浏览器不支持语音播报，请阅读文字回答。</p>
 
       <div v-if="capturedImage" class="capture-preview">
         <img :src="capturedImage" alt="当前摄像头截图预览" />
@@ -120,8 +164,27 @@ async function submitQuestion() {
         <div class="answer-meta">
           <span>{{ latestAnswer.model }}</span>
           <span>{{ latestAnswer.created_at }}</span>
+          <span>{{ isSpeaking ? '正在播报' : '播报就绪' }}</span>
         </div>
         <p>{{ latestAnswer.answer }}</p>
+        <div class="camera-actions">
+          <button
+            class="secondary-button"
+            type="button"
+            :disabled="!canSpeak || isSpeaking"
+            @click="playLatestAnswer"
+          >
+            重新播放
+          </button>
+          <button
+            class="secondary-button"
+            type="button"
+            :disabled="!isSpeaking"
+            @click="stopAnswerSpeech"
+          >
+            停止播报
+          </button>
+        </div>
       </div>
     </section>
   </main>
