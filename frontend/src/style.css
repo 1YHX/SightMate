@@ -40,7 +40,8 @@ button:disabled {
 
 .app-header,
 .camera-panel,
-.voice-panel {
+.voice-panel,
+.capture-panel {
   width: min(1040px, 100%);
   margin: 0 auto;
 }
@@ -53,7 +54,8 @@ button:disabled {
 }
 
 .camera-panel,
-.voice-panel {
+.voice-panel,
+.capture-panel {
   padding: 24px;
   border: 1px solid #d9e1ee;
   border-radius: 8px;
@@ -191,6 +193,21 @@ h2 {
   box-shadow: 0 0 0 3px rgba(34, 111, 84, 0.14);
 }
 
+.capture-preview {
+  overflow: hidden;
+  margin-top: 16px;
+  border: 1px solid #d9e1ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.capture-preview img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
 .camera-actions {
   display: flex;
   gap: 12px;
@@ -242,7 +259,8 @@ h2 {
   }
 
   .camera-panel,
-  .voice-panel {
+  .voice-panel,
+  .capture-panel {
     padding: 18px;
   }
 

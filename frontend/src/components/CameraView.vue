@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { captureVideoFrame } from '../utils/image'
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const stream = ref<MediaStream | null>(null)
@@ -55,6 +56,14 @@ function stopCamera() {
   }
 }
 
+function captureFrame() {
+  if (!stream.value || !videoRef.value) {
+    throw new Error('请先打开摄像头，再截取当前画面。')
+  }
+
+  return captureVideoFrame(videoRef.value)
+}
+
 function getCameraErrorMessage(error: unknown) {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
@@ -75,6 +84,11 @@ function getCameraErrorMessage(error: unknown) {
 
 onBeforeUnmount(() => {
   stopCamera()
+})
+
+defineExpose({
+  captureFrame,
+  isCameraActive
 })
 </script>
 
