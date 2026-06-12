@@ -5,7 +5,15 @@ import CameraView from './components/CameraView.vue'
 import HistoryList from './components/HistoryList.vue'
 import VoiceInput from './components/VoiceInput.vue'
 import type { ChatHistoryMessage, ChatHistoryItem, VisionChatResponse } from './types/chat'
-import { isSpeechSynthesisSupported, speakText, stopSpeaking } from './utils/speech'
+import {
+  createSpeechRecognition,
+  getSpeechErrorMessage,
+  isSpeechRecognitionSupported,
+  isSpeechSynthesisSupported,
+  speakText,
+  stopSpeaking,
+  type BrowserSpeechRecognition
+} from './utils/speech'
 import {
   clearChatHistory,
   loadChatHistory,
@@ -23,7 +31,11 @@ const latestAnswer = ref<VisionChatResponse | null>(null)
 const isSpeaking = ref(false)
 const speechError = ref('')
 const canSpeak = isSpeechSynthesisSupported()
+const canContinuouslyListen = isSpeechRecognitionSupported()
 const chatHistory = ref<ChatHistoryItem[]>(loadChatHistory())
+const isConversationMode = ref(false)
+const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
+const conversationStatus = ref('未开启')
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
@@ -38,9 +50,11 @@ function captureCurrentFrame() {
   }
 }
 
-async function submitQuestion() {
-  if (!canSubmit.value) {
-    if (!question.value.trim()) {
+async function submitQuestion(questionOverride?: string) {
+  const currentQuestion = questionOverride?.trim() ?? question.value.trim()
+
+  if (!currentQuestion || isSubmitting.value) {
+    if (!currentQuestion) {
       chatError.value = '请先输入问题，或使用语音输入生成问题。'
     }
     return
@@ -58,13 +72,13 @@ async function submitQuestion() {
 
     capturedImage.value = imageBase64
     latestAnswer.value = await chatWithVision({
-      question: question.value.trim(),
+      question: currentQuestion,
       image_base64: imageBase64,
       history: buildRecentContext()
     })
     chatHistory.value = prependChatHistoryItem(chatHistory.value, {
       id: crypto.randomUUID(),
-      question: question.value.trim(),
+      question: currentQuestion,
       answer: latestAnswer.value.answer,
       image_base64: imageBase64,
       model: latestAnswer.value.model,
@@ -108,10 +122,12 @@ function playLatestAnswer() {
       },
       onEnd: () => {
         isSpeaking.value = false
+        resumeConversationIfNeeded()
       },
       onError: () => {
         isSpeaking.value = false
         speechError.value = '语音播报失败，请使用文字回答。'
+        resumeConversationIfNeeded()
       }
     })
   } catch (error) {
@@ -123,6 +139,7 @@ function playLatestAnswer() {
 function stopAnswerSpeech() {
   stopSpeaking()
   isSpeaking.value = false
+  resumeConversationIfNeeded()
 }
 
 function clearHistory() {
@@ -130,7 +147,113 @@ function clearHistory() {
   chatHistory.value = []
 }
 
+function startConversationMode() {
+  if (!canContinuouslyListen) {
+    chatError.value = '当前浏览器不支持连续语音识别，请使用手动输入。'
+    return
+  }
+
+  if (isConversationMode.value) {
+    return
+  }
+
+  isConversationMode.value = true
+  conversationStatus.value = '正在聆听'
+  startConversationRecognition()
+}
+
+function stopConversationMode() {
+  isConversationMode.value = false
+  conversationStatus.value = '未开启'
+  conversationRecognition.value?.abort()
+  conversationRecognition.value = null
+}
+
+function startConversationRecognition() {
+  if (
+    !isConversationMode.value ||
+    isSubmitting.value ||
+    isSpeaking.value ||
+    conversationRecognition.value
+  ) {
+    return
+  }
+
+  const recognition = createSpeechRecognition('zh-CN', {
+    continuous: true,
+    interimResults: true
+  })
+
+  if (!recognition) {
+    chatError.value = '当前浏览器不支持连续语音识别，请使用手动输入。'
+    stopConversationMode()
+    return
+  }
+
+  conversationRecognition.value = recognition
+
+  recognition.onstart = () => {
+    conversationStatus.value = '正在聆听'
+  }
+
+  recognition.onend = () => {
+    conversationRecognition.value = null
+    if (isConversationMode.value && !isSubmitting.value && !isSpeaking.value) {
+      window.setTimeout(startConversationRecognition, 300)
+    }
+  }
+
+  recognition.onerror = (event) => {
+    const message = getSpeechErrorMessage(event.error)
+    if (message && event.error !== 'no-speech') {
+      chatError.value = message
+    }
+
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      stopConversationMode()
+    }
+  }
+
+  recognition.onresult = (event) => {
+    let finalText = ''
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index]
+      const transcript = result[0]?.transcript.trim() ?? ''
+
+      if (result.isFinal) {
+        finalText += transcript
+      }
+    }
+
+    if (!finalText || isSubmitting.value) {
+      return
+    }
+
+    question.value = finalText
+    conversationStatus.value = '正在分析'
+    conversationRecognition.value?.stop()
+    void submitQuestion(finalText)
+  }
+
+  try {
+    recognition.start()
+  } catch {
+    conversationRecognition.value = null
+    chatError.value = '连续语音识别启动失败，请重新开启。'
+    stopConversationMode()
+  }
+}
+
+function resumeConversationIfNeeded() {
+  if (isConversationMode.value && !isSubmitting.value && !isSpeaking.value) {
+    conversationStatus.value = '正在聆听'
+    window.setTimeout(startConversationRecognition, 300)
+  }
+}
+
 onBeforeUnmount(() => {
+  stopConversationMode()
   stopSpeaking()
 })
 </script>
@@ -170,6 +293,23 @@ onBeforeUnmount(() => {
         </div>
 
         <p v-if="!canSpeak" class="hint-message">当前浏览器不支持语音播报，请阅读文字回答。</p>
+
+        <div class="conversation-bar">
+          <div>
+            <p class="conversation-title">连续对话</p>
+            <p class="conversation-status">
+              {{ isConversationMode ? conversationStatus : '开启后说完一句话会自动截图并提问' }}
+            </p>
+          </div>
+          <button
+            class="primary-button"
+            type="button"
+            :disabled="!canContinuouslyListen"
+            @click="isConversationMode ? stopConversationMode() : startConversationMode()"
+          >
+            {{ isConversationMode ? '结束连续对话' : '开始连续对话' }}
+          </button>
+        </div>
 
         <div v-if="capturedImage" class="capture-preview compact-preview">
           <img :src="capturedImage" alt="本次提问截图预览" />
@@ -211,7 +351,7 @@ onBeforeUnmount(() => {
             class="primary-button"
             type="button"
             :disabled="!canSubmit"
-            @click="submitQuestion"
+            @click="() => submitQuestion()"
           >
             {{ isSubmitting ? '正在分析...' : '发送并分析当前画面' }}
           </button>

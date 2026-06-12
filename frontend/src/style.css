@@ -275,6 +275,34 @@ h2 {
   background: #fbfdff;
 }
 
+.conversation-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #cce6d6;
+  border-radius: 8px;
+  background: #f0fbf4;
+}
+
+.conversation-title,
+.conversation-status {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.conversation-title {
+  color: #294f3a;
+  font-weight: 800;
+}
+
+.conversation-status {
+  color: #496154;
+  font-size: 14px;
+}
+
 .answer-panel p {
   margin: 10px 0 0;
   color: #263241;
@@ -390,7 +418,8 @@ h2 {
   .app-header,
   .panel-header,
   .camera-actions,
-  .submit-bar {
+  .submit-bar,
+  .conversation-bar {
     align-items: stretch;
     flex-direction: column;
   }

@@ -43,7 +43,13 @@ export function isSpeechRecognitionSupported() {
   return Boolean(speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition)
 }
 
-export function createSpeechRecognition(lang = 'zh-CN') {
+export function createSpeechRecognition(
+  lang = 'zh-CN',
+  options: {
+    continuous?: boolean
+    interimResults?: boolean
+  } = {}
+) {
   const speechWindow = window as WindowWithSpeechRecognition
   const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition
 
@@ -53,8 +59,8 @@ export function createSpeechRecognition(lang = 'zh-CN') {
 
   const recognition = new Recognition()
   recognition.lang = lang
-  recognition.continuous = false
-  recognition.interimResults = true
+  recognition.continuous = options.continuous ?? false
+  recognition.interimResults = options.interimResults ?? true
 
   return recognition
 }
@@ -98,8 +104,9 @@ export function speakText(
 
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = options.lang ?? 'zh-CN'
-  utterance.rate = 1
-  utterance.pitch = 1
+  utterance.rate = 1.08
+  utterance.pitch = 1.12
+  utterance.voice = findLivelyChineseVoice()
 
   utterance.onstart = () => {
     options.onStart?.()
@@ -114,6 +121,26 @@ export function speakText(
   }
 
   window.speechSynthesis.speak(utterance)
+}
+
+function findLivelyChineseVoice() {
+  const voices = window.speechSynthesis.getVoices()
+  const preferredNames = [
+    'Xiaoxiao',
+    'Xiaoyi',
+    'Ting-Ting',
+    'Mei-Jia',
+    'Sinji',
+    'Google 普通话',
+    'Google 國語',
+    'Google 中文'
+  ]
+
+  return (
+    voices.find((voice) => preferredNames.some((name) => voice.name.includes(name))) ??
+    voices.find((voice) => voice.lang.toLowerCase().startsWith('zh')) ??
+    null
+  )
 }
 
 export function stopSpeaking() {
