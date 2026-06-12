@@ -1,0 +1,30 @@
+.DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.local
+
+# IDE
+.idea/
+.vscode/
+
+# Local screenshots and temporary images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
