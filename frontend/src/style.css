@@ -39,7 +39,8 @@ button:disabled {
 }
 
 .app-header,
-.camera-panel {
+.camera-panel,
+.voice-panel {
   width: min(1040px, 100%);
   margin: 0 auto;
 }
@@ -51,7 +52,8 @@ button:disabled {
   gap: 24px;
 }
 
-.camera-panel {
+.camera-panel,
+.voice-panel {
   padding: 24px;
   border: 1px solid #d9e1ee;
   border-radius: 8px;
@@ -149,6 +151,46 @@ h2 {
   line-height: 1.5;
 }
 
+.hint-message,
+.interim-text {
+  margin: 12px 0 0;
+  line-height: 1.5;
+}
+
+.hint-message {
+  color: #667085;
+}
+
+.interim-text {
+  color: #226f54;
+}
+
+.question-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.question-input {
+  width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #cfd8e5;
+  border-radius: 8px;
+  color: #18202f;
+  background: #ffffff;
+  line-height: 1.5;
+  outline: none;
+}
+
+.question-input:focus {
+  border-color: #226f54;
+  box-shadow: 0 0 0 3px rgba(34, 111, 84, 0.14);
+}
+
 .camera-actions {
   display: flex;
   gap: 12px;
@@ -199,7 +241,8 @@ h2 {
     font-size: 32px;
   }
 
-  .camera-panel {
+  .camera-panel,
+  .voice-panel {
     padding: 18px;
   }
 

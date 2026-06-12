@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import CameraView from './components/CameraView.vue'
+import VoiceInput from './components/VoiceInput.vue'
 
 const projectName = 'SightMate'
+const question = ref('')
 </script>
 
 <template>
@@ -17,5 +20,6 @@ const projectName = 'SightMate'
     </header>
 
     <CameraView />
+    <VoiceInput v-model="question" />
   </main>
 </template>
