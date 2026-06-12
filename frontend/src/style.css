@@ -208,6 +208,29 @@ h2 {
   object-fit: contain;
 }
 
+.answer-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #d9e1ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.answer-panel p {
+  margin: 10px 0 0;
+  color: #263241;
+  line-height: 1.7;
+}
+
+.answer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .camera-actions {
   display: flex;
   gap: 12px;

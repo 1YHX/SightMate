@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
 import VoiceInput from './components/VoiceInput.vue'
+import type { VisionChatResponse } from './types/chat'
 
 const projectName = 'SightMate'
 const question = ref('')
 const cameraViewRef = ref<InstanceType<typeof CameraView> | null>(null)
 const capturedImage = ref('')
 const captureError = ref('')
+const chatError = ref('')
+const isSubmitting = ref(false)
+const latestAnswer = ref<VisionChatResponse | null>(null)
+
+const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 
 function captureCurrentFrame() {
   captureError.value = ''
@@ -16,6 +23,37 @@ function captureCurrentFrame() {
     capturedImage.value = cameraViewRef.value?.captureFrame() ?? ''
   } catch (error) {
     captureError.value = error instanceof Error ? error.message : '截图失败，请重试。'
+  }
+}
+
+async function submitQuestion() {
+  if (!canSubmit.value) {
+    if (!question.value.trim()) {
+      chatError.value = '请先输入问题，或使用语音输入生成问题。'
+    }
+    return
+  }
+
+  isSubmitting.value = true
+  captureError.value = ''
+  chatError.value = ''
+
+  try {
+    const imageBase64 = cameraViewRef.value?.captureFrame()
+    if (!imageBase64) {
+      throw new Error('请先打开摄像头，再发送问题。')
+    }
+
+    capturedImage.value = imageBase64
+    latestAnswer.value = await chatWithVision({
+      question: question.value.trim(),
+      image_base64: imageBase64,
+      history: []
+    })
+  } catch (error) {
+    chatError.value = error instanceof Error ? error.message : '请求失败，请稍后重试。'
+  } finally {
+    isSubmitting.value = false
   }
 }
 </script>
@@ -46,12 +84,13 @@ function captureCurrentFrame() {
         </div>
       </div>
 
-      <p class="hint-message">
-        点击按钮会从当前摄像头画面截取一张 JPEG 图片，最长边限制为 1024px。
-      </p>
+      <p class="hint-message">发送问题时会自动截取当前画面，也可以先手动截图预览。</p>
 
       <p v-if="captureError" class="error-message" role="alert">
         {{ captureError }}
+      </p>
+      <p v-if="chatError" class="error-message" role="alert">
+        {{ chatError }}
       </p>
 
       <div v-if="capturedImage" class="capture-preview">
@@ -59,9 +98,30 @@ function captureCurrentFrame() {
       </div>
 
       <div class="camera-actions">
-        <button class="primary-button" type="button" @click="captureCurrentFrame">
+        <button
+          class="primary-button"
+          type="button"
+          :disabled="!canSubmit"
+          @click="submitQuestion"
+        >
+          {{ isSubmitting ? '正在发送...' : '发送问题' }}
+        </button>
+        <button
+          class="secondary-button"
+          type="button"
+          :disabled="isSubmitting"
+          @click="captureCurrentFrame"
+        >
           截取当前画面
         </button>
+      </div>
+
+      <div v-if="latestAnswer" class="answer-panel">
+        <div class="answer-meta">
+          <span>{{ latestAnswer.model }}</span>
+          <span>{{ latestAnswer.created_at }}</span>
+        </div>
+        <p>{{ latestAnswer.answer }}</p>
       </div>
     </section>
   </main>
