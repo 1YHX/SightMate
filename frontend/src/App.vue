@@ -34,6 +34,7 @@ const canContinuouslyListen = isSpeechRecognitionSupported()
 const chatHistory = ref<ChatHistoryItem[]>(loadChatHistory())
 const isConversationMode = ref(false)
 const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
+const interruptionRecognition = ref<BrowserSpeechRecognition | null>(null)
 const conversationStatus = ref('未开启')
 const pendingTranscript = ref('')
 let autoSubmitTimer: number | undefined
@@ -110,13 +111,16 @@ function playLatestAnswer() {
     speakText(latestAnswer.value.answer, {
       onStart: () => {
         isSpeaking.value = true
+        startInterruptionRecognition()
       },
       onEnd: () => {
         isSpeaking.value = false
+        stopInterruptionRecognition()
         resumeConversationIfNeeded()
       },
       onError: () => {
         isSpeaking.value = false
+        stopInterruptionRecognition()
         speechError.value = '语音播报失败，请使用文字回答。'
         resumeConversationIfNeeded()
       }
@@ -129,6 +133,7 @@ function playLatestAnswer() {
 
 function stopAnswerSpeech() {
   stopSpeaking()
+  stopInterruptionRecognition()
   isSpeaking.value = false
   resumeConversationIfNeeded()
 }
@@ -137,7 +142,9 @@ function clearHistory() {
   clearChatHistory()
   chatHistory.value = []
   latestAnswer.value = null
-  stopAnswerSpeech()
+  stopSpeaking()
+  stopInterruptionRecognition()
+  isSpeaking.value = false
 }
 
 function startConversationMode() {
@@ -160,6 +167,7 @@ function stopConversationMode() {
   conversationStatus.value = '未开启'
   pendingTranscript.value = ''
   clearAutoSubmitTimer()
+  stopInterruptionRecognition()
   conversationRecognition.value?.abort()
   conversationRecognition.value = null
 }
@@ -272,6 +280,64 @@ function clearAutoSubmitTimer() {
     window.clearTimeout(autoSubmitTimer)
     autoSubmitTimer = undefined
   }
+}
+
+function startInterruptionRecognition() {
+  if (!isConversationMode.value || !canContinuouslyListen || interruptionRecognition.value) {
+    return
+  }
+
+  const recognition = createSpeechRecognition('zh-CN', {
+    continuous: true,
+    interimResults: true
+  })
+
+  if (!recognition) {
+    return
+  }
+
+  interruptionRecognition.value = recognition
+
+  recognition.onresult = (event) => {
+    let heardText = ''
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index]
+      heardText += result[0]?.transcript.trim() ?? ''
+    }
+
+    if (!heardText.trim()) {
+      return
+    }
+
+    pendingTranscript.value = heardText.trim()
+    question.value = pendingTranscript.value
+    stopSpeaking()
+    stopInterruptionRecognition()
+    isSpeaking.value = false
+    conversationStatus.value = '听到打断，等待你说完'
+    clearAutoSubmitTimer()
+    autoSubmitTimer = window.setTimeout(submitPendingConversationQuestion, 900)
+  }
+
+  recognition.onend = () => {
+    interruptionRecognition.value = null
+  }
+
+  recognition.onerror = () => {
+    interruptionRecognition.value = null
+  }
+
+  try {
+    recognition.start()
+  } catch {
+    interruptionRecognition.value = null
+  }
+}
+
+function stopInterruptionRecognition() {
+  interruptionRecognition.value?.abort()
+  interruptionRecognition.value = null
 }
 
 function resumeConversationIfNeeded() {

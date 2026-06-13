@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { ChatHistoryItem } from '../types/chat'
 
 defineProps<{
@@ -8,6 +9,22 @@ defineProps<{
 defineEmits<{
   clear: []
 }>()
+
+const expandedIds = ref<Set<string>>(new Set())
+
+function toggleItem(id: string) {
+  const nextIds = new Set(expandedIds.value)
+  if (nextIds.has(id)) {
+    nextIds.delete(id)
+  } else {
+    nextIds.add(id)
+  }
+  expandedIds.value = nextIds
+}
+
+function summarize(text: string, maxLength = 64) {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
 </script>
 
 <template>
@@ -31,14 +48,20 @@ defineEmits<{
 
     <ol v-else class="history-list">
       <li v-for="item in items" :key="item.id" class="history-item">
-        <img :src="item.image_base64" alt="历史截图" />
         <div class="history-content">
           <div class="answer-meta">
             <span>{{ item.model }}</span>
             <span>{{ item.created_at }}</span>
           </div>
-          <p class="history-question">{{ item.question }}</p>
-          <p class="history-answer">{{ item.answer }}</p>
+          <button class="history-summary-button" type="button" @click="toggleItem(item.id)">
+            <span>{{ summarize(item.question) }}</span>
+            <span>{{ expandedIds.has(item.id) ? '收起' : '展开' }}</span>
+          </button>
+          <p class="history-answer">{{ summarize(item.answer, 96) }}</p>
+          <div v-if="expandedIds.has(item.id)" class="history-detail">
+            <p class="history-question">你：{{ item.question }}</p>
+            <p class="history-answer">SightMate：{{ item.answer }}</p>
+          </div>
         </div>
       </li>
     </ol>

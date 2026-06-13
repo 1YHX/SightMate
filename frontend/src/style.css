@@ -340,25 +340,27 @@ h2 {
 }
 
 .history-item {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 14px;
   padding: 14px;
   border: 1px solid #d9e1ee;
   border-radius: 8px;
   background: #f8fafc;
 }
 
-.history-item img {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 6px;
-  object-fit: cover;
-  background: #111827;
-}
-
 .history-content {
   min-width: 0;
+}
+
+.history-summary-button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 0;
+  color: #18202f;
+  background: transparent;
+  text-align: left;
+  font-weight: 800;
 }
 
 .history-question,
@@ -374,6 +376,12 @@ h2 {
 
 .history-answer {
   color: #49566b;
+}
+
+.history-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #d9e1ee;
 }
 
 .compact-button {
@@ -444,10 +452,6 @@ h2 {
   .camera-panel,
   .history-panel {
     padding: 18px;
-  }
-
-  .history-item {
-    grid-template-columns: 1fr;
   }
 
   .chat-bubble {

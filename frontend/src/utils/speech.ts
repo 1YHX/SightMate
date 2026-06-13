@@ -102,7 +102,7 @@ export function speakText(
 
   window.speechSynthesis.cancel()
 
-  const utterance = new SpeechSynthesisUtterance(toSpeakableText(text))
+  const utterance = new SpeechSynthesisUtterance(toBriefSpeakableText(text))
   utterance.lang = options.lang ?? 'zh-CN'
   utterance.rate = 1.08
   utterance.pitch = 1.12
@@ -138,6 +138,18 @@ function toSpeakableText(text: string) {
     .replace(/[>#|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function toBriefSpeakableText(text: string) {
+  const speakableText = toSpeakableText(text)
+  const sentences = speakableText.match(/[^。！？!?]+[。！？!?]?/g) ?? [speakableText]
+  const briefText = sentences.slice(0, 2).join('').trim()
+
+  if (briefText.length <= 120) {
+    return briefText
+  }
+
+  return `${briefText.slice(0, 120)}。`
 }
 
 function findLivelyChineseVoice() {
