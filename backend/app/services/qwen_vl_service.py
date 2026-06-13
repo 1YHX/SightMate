@@ -1,8 +1,12 @@
+import logging
+
 import httpx
 
 from app.config import settings
 from app.schemas import ChatHistoryMessage
 
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 你是 SightMate，一个 AI 视觉对话助手。你正在和用户进行摄像头画面辅助的自然对话。
@@ -51,10 +55,6 @@ class QwenVLService:
         payload = {
             "model": self.model,
             "messages": [
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT,
-                },
                 *self._build_history_messages(history),
                 {
                     "role": "user",
@@ -62,6 +62,7 @@ class QwenVLService:
                         {
                             "type": "text",
                             "text": (
+                                f"{SYSTEM_PROMPT}\n\n"
                                 f"用户当前问题：{question}\n\n"
                                 "下面的图片是用户提问瞬间的摄像头截图，只在问题需要视觉信息时作为参考。"
                             ),
@@ -89,13 +90,28 @@ class QwenVLService:
                 )
                 response.raise_for_status()
         except httpx.HTTPStatusError as error:
+            logger.warning(
+                "Qwen-VL upstream HTTP %s: %s",
+                error.response.status_code,
+                error.response.text[:1000],
+            )
             raise QwenVLUpstreamError(
                 f"Qwen-VL upstream returned status {error.response.status_code}"
             ) from error
+        except httpx.TimeoutException as error:
+            logger.warning("Qwen-VL upstream request timed out")
+            raise QwenVLUpstreamError("Qwen-VL upstream request timed out") from error
         except httpx.HTTPError as error:
+            logger.warning("Qwen-VL upstream request failed: %s", error)
             raise QwenVLUpstreamError("Qwen-VL upstream request failed") from error
 
-        return self._extract_answer(response.json())
+        try:
+            data = response.json()
+        except ValueError as error:
+            logger.warning("Qwen-VL upstream returned non-JSON response: %s", response.text[:1000])
+            raise QwenVLUpstreamError("Qwen-VL upstream response is not JSON") from error
+
+        return self._extract_answer(data)
 
     def _build_history_messages(self, history: list[ChatHistoryMessage]) -> list[dict[str, str]]:
         return [
