@@ -104,7 +104,7 @@ export function speakText(
     throw new Error('当前浏览器不支持语音播报。')
   }
 
-  const speechText = toBriefSpeakableText(text)
+  const speechText = toSpeakableText(text)
   if (!speechText) {
     throw new Error('没有可播报的回答内容。')
   }
@@ -156,18 +156,6 @@ function toSpeakableText(text: string) {
     .replace(/[>#|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-function toBriefSpeakableText(text: string) {
-  const speakableText = toSpeakableText(text)
-  const sentences = speakableText.match(/[^。！？!?]+[。！？!?]?/g) ?? [speakableText]
-  const briefText = sentences.slice(0, 4).join('').trim()
-
-  if (briefText.length <= 260) {
-    return briefText
-  }
-
-  return `${briefText.slice(0, 260).replace(/[，、；：,.，\s]+$/, '')}。`
 }
 
 function findLivelyChineseVoice() {
