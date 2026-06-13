@@ -38,6 +38,7 @@ const interruptionRecognition = ref<BrowserSpeechRecognition | null>(null)
 const conversationStatus = ref('未开启')
 const pendingTranscript = ref('')
 let autoSubmitTimer: number | undefined
+let interruptionStartTimer: number | undefined
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
@@ -111,18 +112,22 @@ function playLatestAnswer() {
     speakText(latestAnswer.value.answer, {
       onStart: () => {
         isSpeaking.value = true
-        startInterruptionRecognition()
+        scheduleInterruptionRecognition()
       },
       onEnd: () => {
         isSpeaking.value = false
         stopInterruptionRecognition()
-        resumeConversationIfNeeded()
+        if (!pendingTranscript.value) {
+          resumeConversationIfNeeded()
+        }
       },
       onError: () => {
         isSpeaking.value = false
         stopInterruptionRecognition()
         speechError.value = '语音播报失败，请使用文字回答。'
-        resumeConversationIfNeeded()
+        if (!pendingTranscript.value) {
+          resumeConversationIfNeeded()
+        }
       }
     })
   } catch (error) {
@@ -167,6 +172,7 @@ function stopConversationMode() {
   conversationStatus.value = '未开启'
   pendingTranscript.value = ''
   clearAutoSubmitTimer()
+  clearInterruptionStartTimer()
   stopInterruptionRecognition()
   conversationRecognition.value?.abort()
   conversationRecognition.value = null
@@ -335,9 +341,27 @@ function startInterruptionRecognition() {
   }
 }
 
+function scheduleInterruptionRecognition() {
+  clearInterruptionStartTimer()
+  interruptionStartTimer = window.setTimeout(() => {
+    interruptionStartTimer = undefined
+    if (isSpeaking.value) {
+      startInterruptionRecognition()
+    }
+  }, 800)
+}
+
 function stopInterruptionRecognition() {
+  clearInterruptionStartTimer()
   interruptionRecognition.value?.abort()
   interruptionRecognition.value = null
+}
+
+function clearInterruptionStartTimer() {
+  if (interruptionStartTimer) {
+    window.clearTimeout(interruptionStartTimer)
+    interruptionStartTimer = undefined
+  }
 }
 
 function resumeConversationIfNeeded() {

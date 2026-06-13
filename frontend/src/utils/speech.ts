@@ -30,6 +30,10 @@ export type SpeechRecognitionEvent = {
   }
 }
 
+type SpeechSynthesisErrorEventWithReason = Event & {
+  error?: string
+}
+
 type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition
 
 type WindowWithSpeechRecognition = Window &
@@ -100,9 +104,14 @@ export function speakText(
     throw new Error('当前浏览器不支持语音播报。')
   }
 
+  const speechText = toBriefSpeakableText(text)
+  if (!speechText) {
+    throw new Error('没有可播报的回答内容。')
+  }
+
   window.speechSynthesis.cancel()
 
-  const utterance = new SpeechSynthesisUtterance(toBriefSpeakableText(text))
+  const utterance = new SpeechSynthesisUtterance(speechText)
   utterance.lang = options.lang ?? 'zh-CN'
   utterance.rate = 1.08
   utterance.pitch = 1.12
@@ -116,11 +125,20 @@ export function speakText(
     options.onEnd?.()
   }
 
-  utterance.onerror = () => {
+  utterance.onerror = (event) => {
+    const error = (event as SpeechSynthesisErrorEventWithReason).error
+    if (error === 'interrupted' || error === 'canceled') {
+      options.onEnd?.()
+      return
+    }
+
     options.onError?.()
   }
 
-  window.speechSynthesis.speak(utterance)
+  window.setTimeout(() => {
+    window.speechSynthesis.resume()
+    window.speechSynthesis.speak(utterance)
+  }, 80)
 }
 
 function toSpeakableText(text: string) {
