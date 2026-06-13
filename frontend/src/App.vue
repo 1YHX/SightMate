@@ -41,6 +41,7 @@ const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
 const interruptionRecognition = ref<BrowserSpeechRecognition | null>(null)
 const conversationStatus = ref('未开启')
 const pendingTranscript = ref('')
+const capturedFrameForCurrentTurn = ref<string | null>(null)
 const selectedSessionId = ref<string | undefined>(chatSessions.value[0]?.id)
 const professionalAudio = ref<HTMLAudioElement | null>(null)
 let autoSubmitTimer: number | undefined
@@ -76,7 +77,8 @@ async function submitQuestion(questionOverride?: string) {
   chatError.value = ''
 
   try {
-    const imageBase64 = cameraViewRef.value?.captureFrame()
+    const imageBase64 = capturedFrameForCurrentTurn.value ?? cameraViewRef.value?.captureFrame()
+    capturedFrameForCurrentTurn.value = null
     if (!imageBase64) {
       throw new Error('请先打开摄像头，再发送问题。')
     }
@@ -100,6 +102,7 @@ async function submitQuestion(questionOverride?: string) {
     await scrollChatToBottom()
     playLatestAnswer()
   } catch (error) {
+    capturedFrameForCurrentTurn.value = null
     chatError.value = error instanceof Error ? error.message : '请求失败，请稍后重试。'
   } finally {
     isSubmitting.value = false
@@ -203,6 +206,7 @@ function clearHistory() {
   chatSessions.value = []
   selectedSessionId.value = undefined
   latestAnswer.value = null
+  capturedFrameForCurrentTurn.value = null
   stopSpeaking()
   stopProfessionalAudio()
   isSpeaking.value = false
@@ -214,12 +218,14 @@ function startNewSession() {
   selectedSessionId.value = result.sessionId
   latestAnswer.value = null
   question.value = ''
+  capturedFrameForCurrentTurn.value = null
   void scrollChatToBottom()
 }
 
 function deleteSession(id: string) {
   const nextSessions = deleteChatSession(chatSessions.value, id)
   chatSessions.value = nextSessions
+  capturedFrameForCurrentTurn.value = null
 
   if (selectedSessionId.value === id) {
     const nextSession = nextSessions[0]
@@ -266,6 +272,7 @@ function stopVideoConversation() {
 
 function selectHistoryItem(id: string) {
   selectedSessionId.value = id
+  capturedFrameForCurrentTurn.value = null
   const session = chatSessions.value.find((item) => item.id === id)
   const lastTurn = session?.turns[session.turns.length - 1]
   if (lastTurn) {
@@ -310,6 +317,7 @@ function stopConversationMode() {
   isConversationMode.value = false
   conversationStatus.value = '未开启'
   pendingTranscript.value = ''
+  capturedFrameForCurrentTurn.value = null
   clearAutoSubmitTimer()
   clearInterruptionStartTimer()
   stopInterruptionRecognition()
@@ -383,6 +391,7 @@ function startConversationRecognition() {
       return
     }
 
+    captureFrameForCurrentTurn()
     question.value = nextTranscript
     pendingTranscript.value = nextTranscript
 
@@ -427,6 +436,19 @@ function clearAutoSubmitTimer() {
   }
 }
 
+function captureFrameForCurrentTurn() {
+  if (capturedFrameForCurrentTurn.value) {
+    return
+  }
+
+  try {
+    // Lock the frame when speech starts so the visual context matches the user's words.
+    capturedFrameForCurrentTurn.value = cameraViewRef.value?.captureFrame() ?? null
+  } catch {
+    capturedFrameForCurrentTurn.value = null
+  }
+}
+
 function startInterruptionRecognition() {
   if (!isConversationMode.value || !canContinuouslyListen || interruptionRecognition.value) {
     return
@@ -459,6 +481,7 @@ function startInterruptionRecognition() {
       return
     }
 
+    captureFrameForCurrentTurn()
     pendingTranscript.value = heardText.trim()
     question.value = pendingTranscript.value
     stopSpeaking()
