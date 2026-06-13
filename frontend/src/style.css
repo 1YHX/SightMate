@@ -234,29 +234,6 @@ h2 {
   box-shadow: 0 0 0 3px rgba(34, 111, 84, 0.14);
 }
 
-.capture-preview {
-  overflow: hidden;
-  margin-top: 16px;
-  border: 1px solid #d9e1ee;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.compact-preview {
-  margin-top: 14px;
-}
-
-.capture-preview img {
-  display: block;
-  width: 100%;
-  max-height: 420px;
-  object-fit: contain;
-}
-
-.compact-preview img {
-  max-height: 180px;
-}
-
 .answer-panel {
   margin-top: 18px;
   padding: 16px;

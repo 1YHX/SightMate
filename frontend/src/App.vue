@@ -23,7 +23,6 @@ import {
 const projectName = 'SightMate'
 const question = ref('')
 const cameraViewRef = ref<InstanceType<typeof CameraView> | null>(null)
-const capturedImage = ref('')
 const captureError = ref('')
 const chatError = ref('')
 const isSubmitting = ref(false)
@@ -41,16 +40,6 @@ let autoSubmitTimer: number | undefined
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
-
-function captureCurrentFrame() {
-  captureError.value = ''
-
-  try {
-    capturedImage.value = cameraViewRef.value?.captureFrame() ?? ''
-  } catch (error) {
-    captureError.value = error instanceof Error ? error.message : '截图失败，请重试。'
-  }
-}
 
 async function submitQuestion(questionOverride?: string) {
   const currentQuestion = questionOverride?.trim() ?? question.value.trim()
@@ -72,7 +61,6 @@ async function submitQuestion(questionOverride?: string) {
       throw new Error('请先打开摄像头，再发送问题。')
     }
 
-    capturedImage.value = imageBase64
     latestAnswer.value = await chatWithVision({
       question: currentQuestion,
       image_base64: imageBase64,
@@ -350,10 +338,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="capturedImage" class="capture-preview compact-preview">
-          <img :src="capturedImage" alt="本次提问截图预览" />
-        </div>
-
         <div v-if="latestAnswer" class="answer-panel">
           <div class="answer-meta">
             <span>{{ latestAnswer.model }}</span>
@@ -393,14 +377,6 @@ onBeforeUnmount(() => {
             @click="() => submitQuestion()"
           >
             {{ isSubmitting ? '正在分析...' : '发送并分析当前画面' }}
-          </button>
-          <button
-            class="secondary-button"
-            type="button"
-            :disabled="isSubmitting"
-            @click="captureCurrentFrame"
-          >
-            预览截图
           </button>
         </div>
       </section>
