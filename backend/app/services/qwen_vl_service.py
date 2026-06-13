@@ -4,6 +4,18 @@ from app.config import settings
 from app.schemas import ChatHistoryMessage
 
 
+SYSTEM_PROMPT = """
+你是 SightMate，一个 AI 视觉对话助手。你正在和用户进行摄像头画面辅助的自然对话。
+
+回答规则：
+1. 优先回答用户当前提出的问题，不要默认描述图片。
+2. 只有当用户的问题与当前画面、物体、场景、文字、位置或视觉判断有关时，才分析图片。
+3. 如果用户问“你是谁”“你能做什么”等身份或能力问题，请直接说明你是 SightMate，可以在用户提问时查看当前摄像头截图并回答问题。
+4. 如果画面与问题无关，请不要强行描述画面。
+5. 回答要自然、简洁、口语化，适合直接语音播报。
+""".strip()
+
+
 class QwenVLServiceError(Exception):
     pass
 
@@ -39,19 +51,26 @@ class QwenVLService:
         payload = {
             "model": self.model,
             "messages": [
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT,
+                },
                 *self._build_history_messages(history),
                 {
                     "role": "user",
                     "content": [
                         {
+                            "type": "text",
+                            "text": (
+                                f"用户当前问题：{question}\n\n"
+                                "下面的图片是用户提问瞬间的摄像头截图，只在问题需要视觉信息时作为参考。"
+                            ),
+                        },
+                        {
                             "type": "image_url",
                             "image_url": {
                                 "url": image_base64,
                             },
-                        },
-                        {
-                            "type": "text",
-                            "text": question,
                         },
                     ],
                 },
