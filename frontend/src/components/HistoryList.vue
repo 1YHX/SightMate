@@ -14,8 +14,8 @@ defineEmits<{
   <section class="history-panel tool-panel" aria-labelledby="history-title">
     <div class="panel-header">
       <div>
-        <p class="eyebrow">历史记录</p>
-        <h2 id="history-title">最近对话</h2>
+        <p class="eyebrow">历史归档</p>
+        <h2 id="history-title">本地保存记录</h2>
       </div>
       <button
         class="secondary-button compact-button"
@@ -27,7 +27,7 @@ defineEmits<{
       </button>
     </div>
 
-    <p v-if="!items.length" class="hint-message">暂无历史记录。</p>
+    <p v-if="!items.length" class="hint-message">暂无本地历史记录。</p>
 
     <ol v-else class="history-list">
       <li v-for="item in items" :key="item.id" class="history-item">

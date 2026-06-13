@@ -40,6 +40,7 @@ let autoSubmitTimer: number | undefined
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
+const chatTimeline = computed(() => [...chatHistory.value].reverse())
 
 async function submitQuestion(questionOverride?: string) {
   const currentQuestion = questionOverride?.trim() ?? question.value.trim()
@@ -135,6 +136,8 @@ function stopAnswerSpeech() {
 function clearHistory() {
   clearChatHistory()
   chatHistory.value = []
+  latestAnswer.value = null
+  stopAnswerSpeech()
 }
 
 function startConversationMode() {
@@ -338,34 +341,44 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="latestAnswer" class="answer-panel">
-          <div class="answer-meta">
-            <span>{{ latestAnswer.model }}</span>
-            <span>{{ latestAnswer.created_at }}</span>
-            <span>{{ isSpeaking ? '正在播报' : '播报就绪' }}</span>
-          </div>
-          <p>{{ latestAnswer.answer }}</p>
-          <div class="camera-actions">
-            <button
-              class="secondary-button"
-              type="button"
-              :disabled="!canSpeak || isSpeaking"
-              @click="playLatestAnswer"
-            >
-              重新播放
-            </button>
-            <button
-              class="secondary-button"
-              type="button"
-              :disabled="!isSpeaking"
-              @click="stopAnswerSpeech"
-            >
-              停止播报
-            </button>
+        <div v-if="chatTimeline.length" class="chat-thread" aria-label="当前聊天记录">
+          <div v-for="item in chatTimeline" :key="item.id" class="chat-turn">
+            <div class="chat-bubble user-bubble">
+              <p>{{ item.question }}</p>
+            </div>
+            <div class="chat-bubble assistant-bubble">
+              <div class="answer-meta">
+                <span>{{ item.model }}</span>
+                <span>{{ item.created_at }}</span>
+                <span v-if="latestAnswer?.created_at === item.created_at">
+                  {{ isSpeaking ? '正在播报' : '播报就绪' }}
+                </span>
+              </div>
+              <p>{{ item.answer }}</p>
+            </div>
           </div>
         </div>
 
-        <p v-else class="empty-answer">打开摄像头后，用语音或文字提问，SightMate 会在发送时截取当前画面。</p>
+        <p v-else class="empty-answer">打开摄像头后，用语音或文字提问，聊天记录会显示在这里。</p>
+
+        <div v-if="latestAnswer" class="playback-bar">
+          <button
+            class="secondary-button"
+            type="button"
+            :disabled="!canSpeak || isSpeaking"
+            @click="playLatestAnswer"
+          >
+            重新播放最新回答
+          </button>
+          <button
+            class="secondary-button"
+            type="button"
+            :disabled="!isSpeaking"
+            @click="stopAnswerSpeech"
+          >
+            停止播报
+          </button>
+        </div>
 
         <VoiceInput v-model="question" />
 
