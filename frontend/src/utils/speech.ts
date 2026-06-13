@@ -43,6 +43,7 @@ type WindowWithSpeechRecognition = Window &
   }
 
 let activeSpeechRunId = 0
+let speechKeepAliveTimer: number | undefined
 
 export function isSpeechRecognitionSupported() {
   const speechWindow = window as WindowWithSpeechRecognition
@@ -113,57 +114,46 @@ export function speakText(
 
   const speechRunId = activeSpeechRunId + 1
   activeSpeechRunId = speechRunId
-  const chunks = splitSpeakableText(speechText)
-  const voice = findLivelyChineseVoice()
-  let chunkIndex = 0
-  let hasStarted = false
 
+  clearSpeechKeepAliveTimer()
   window.speechSynthesis.cancel()
 
-  const speakNextChunk = () => {
+  const utterance = new SpeechSynthesisUtterance(speechText)
+  utterance.lang = options.lang ?? 'zh-CN'
+  utterance.rate = 0.96
+  utterance.pitch = 1.04
+  utterance.volume = 1
+  utterance.voice = findLivelyChineseVoice()
+
+  utterance.onstart = () => {
+    options.onStart?.()
+    speechKeepAliveTimer = window.setInterval(() => {
+      if (speechRunId === activeSpeechRunId && window.speechSynthesis.speaking) {
+        window.speechSynthesis.resume()
+      }
+    }, 3000)
+  }
+
+  utterance.onend = () => {
+    if (speechRunId === activeSpeechRunId) {
+      clearSpeechKeepAliveTimer()
+      options.onEnd?.()
+    }
+  }
+
+  utterance.onerror = (event) => {
     if (speechRunId !== activeSpeechRunId) {
       return
     }
 
-    const chunk = chunks[chunkIndex]
-    if (!chunk) {
+    clearSpeechKeepAliveTimer()
+    const error = (event as SpeechSynthesisErrorEventWithReason).error
+    if (error === 'interrupted' || error === 'canceled') {
       options.onEnd?.()
       return
     }
 
-    const utterance = new SpeechSynthesisUtterance(chunk)
-    utterance.lang = options.lang ?? 'zh-CN'
-    utterance.rate = 1
-    utterance.pitch = 1.06
-    utterance.volume = 1
-    utterance.voice = voice
-
-    utterance.onstart = () => {
-      if (!hasStarted) {
-        hasStarted = true
-        options.onStart?.()
-      }
-    }
-
-    utterance.onend = () => {
-      chunkIndex += 1
-      window.setTimeout(speakNextChunk, 70)
-    }
-
-    utterance.onerror = (event) => {
-      if (speechRunId !== activeSpeechRunId) {
-        return
-      }
-
-      const error = (event as SpeechSynthesisErrorEventWithReason).error
-      if (error === 'interrupted' || error === 'canceled') {
-        return
-      }
-
-      options.onError?.()
-    }
-
-    window.speechSynthesis.speak(utterance)
+    options.onError?.()
   }
 
   window.setTimeout(() => {
@@ -172,7 +162,7 @@ export function speakText(
     }
 
     window.speechSynthesis.resume()
-    speakNextChunk()
+    window.speechSynthesis.speak(utterance)
   }, 120)
 }
 
@@ -191,47 +181,6 @@ function toSpeakableText(text: string) {
     .replace(/[>#|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-function splitSpeakableText(text: string) {
-  const sentences = text.match(/[^。！？!?；;]+[。！？!?；;]?/g) ?? [text]
-  const chunks: string[] = []
-
-  sentences.forEach((sentence) => {
-    const cleanSentence = sentence.trim()
-    if (!cleanSentence) {
-      return
-    }
-
-    if (cleanSentence.length <= 80) {
-      chunks.push(cleanSentence)
-      return
-    }
-
-    const parts = cleanSentence.match(/[^，、,]+[，、,]?/g) ?? [cleanSentence]
-    let currentChunk = ''
-
-    parts.forEach((part) => {
-      const cleanPart = part.trim()
-      if (!cleanPart) {
-        return
-      }
-
-      if (currentChunk && currentChunk.length + cleanPart.length > 80) {
-        chunks.push(currentChunk)
-        currentChunk = cleanPart
-        return
-      }
-
-      currentChunk += cleanPart
-    })
-
-    if (currentChunk) {
-      chunks.push(currentChunk)
-    }
-  })
-
-  return chunks
 }
 
 function findLivelyChineseVoice() {
@@ -257,6 +206,14 @@ function findLivelyChineseVoice() {
 export function stopSpeaking() {
   if (isSpeechSynthesisSupported()) {
     activeSpeechRunId += 1
+    clearSpeechKeepAliveTimer()
     window.speechSynthesis.cancel()
+  }
+}
+
+function clearSpeechKeepAliveTimer() {
+  if (speechKeepAliveTimer) {
+    window.clearInterval(speechKeepAliveTimer)
+    speechKeepAliveTimer = undefined
   }
 }

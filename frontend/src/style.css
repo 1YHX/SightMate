@@ -39,8 +39,7 @@ button:disabled {
 }
 
 .app-header,
-.workspace,
-.history-panel {
+.app-body {
   width: min(1280px, 100%);
   margin: 0 auto;
 }
@@ -60,11 +59,19 @@ button:disabled {
   box-shadow: 0 16px 40px rgba(24, 32, 47, 0.08);
 }
 
+.app-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.75fr);
   gap: 20px;
   align-items: start;
+  min-width: 0;
 }
 
 .video-column,
@@ -87,6 +94,18 @@ button:disabled {
 
 .voice-panel .panel-header {
   margin-bottom: 12px;
+}
+
+.text-fallback {
+  margin-top: 18px;
+}
+
+.compact-panel-header {
+  margin-bottom: 10px;
+}
+
+.compact-panel-header h2 {
+  font-size: 20px;
 }
 
 .eyebrow {
@@ -333,14 +352,16 @@ h2 {
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .history-item {
-  padding: 14px;
+  padding: 12px;
   border: 1px solid #d9e1ee;
   border-radius: 8px;
   background: #f8fafc;
@@ -361,6 +382,10 @@ h2 {
   background: transparent;
   text-align: left;
   font-weight: 800;
+}
+
+.history-summary-button.active {
+  color: #226f54;
 }
 
 .history-question,
@@ -465,6 +490,7 @@ h2 {
 }
 
 @media (max-width: 980px) {
+  .app-body,
   .workspace {
     grid-template-columns: 1fr;
   }

@@ -88,6 +88,8 @@ onBeforeUnmount(() => {
 
 defineExpose({
   captureFrame,
+  startCamera,
+  stopCamera,
   isCameraActive
 })
 </script>
@@ -122,23 +124,6 @@ defineExpose({
       {{ errorMessage }}
     </p>
 
-    <div class="camera-actions">
-      <button
-        class="primary-button"
-        type="button"
-        :disabled="isStarting || isCameraActive"
-        @click="startCamera"
-      >
-        {{ isStarting ? '正在开启...' : '打开摄像头' }}
-      </button>
-      <button
-        class="secondary-button"
-        type="button"
-        :disabled="!isCameraActive"
-        @click="stopCamera"
-      >
-        关闭摄像头
-      </button>
-    </div>
+    <p class="hint-message">使用右侧的“开始视频对话”统一开启摄像头和连续语音。</p>
   </section>
 </template>

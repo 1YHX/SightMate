@@ -4,10 +4,12 @@ import type { ChatHistoryItem } from '../types/chat'
 
 defineProps<{
   items: ChatHistoryItem[]
+  activeId?: string
 }>()
 
 defineEmits<{
   clear: []
+  select: [id: string]
 }>()
 
 const expandedIds = ref<Set<string>>(new Set())
@@ -28,7 +30,7 @@ function summarize(text: string, maxLength = 64) {
 </script>
 
 <template>
-  <section class="history-panel tool-panel" aria-labelledby="history-title">
+  <aside class="history-panel tool-panel" aria-labelledby="history-title">
     <div class="panel-header">
       <div>
         <p class="eyebrow">历史归档</p>
@@ -53,11 +55,15 @@ function summarize(text: string, maxLength = 64) {
             <span>{{ item.model }}</span>
             <span>{{ item.created_at }}</span>
           </div>
-          <button class="history-summary-button" type="button" @click="toggleItem(item.id)">
+          <button
+            class="history-summary-button"
+            type="button"
+            :class="{ active: activeId === item.id }"
+            @click="$emit('select', item.id); toggleItem(item.id)"
+          >
             <span>{{ summarize(item.question) }}</span>
             <span>{{ expandedIds.has(item.id) ? '收起' : '展开' }}</span>
           </button>
-          <p class="history-answer">{{ summarize(item.answer, 96) }}</p>
           <div v-if="expandedIds.has(item.id)" class="history-detail">
             <p class="history-question">你：{{ item.question }}</p>
             <p class="history-answer">SightMate：{{ item.answer }}</p>
@@ -65,5 +71,5 @@ function summarize(text: string, maxLength = 64) {
         </div>
       </li>
     </ol>
-  </section>
+  </aside>
 </template>

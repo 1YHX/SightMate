@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
 import HistoryList from './components/HistoryList.vue'
-import VoiceInput from './components/VoiceInput.vue'
 import type { ChatHistoryMessage, ChatHistoryItem, VisionChatResponse } from './types/chat'
 import {
   createSpeechRecognition,
@@ -37,12 +36,14 @@ const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
 const interruptionRecognition = ref<BrowserSpeechRecognition | null>(null)
 const conversationStatus = ref('未开启')
 const pendingTranscript = ref('')
+const selectedHistoryId = ref<string | undefined>(chatHistory.value[0]?.id)
 let autoSubmitTimer: number | undefined
 let interruptionStartTimer: number | undefined
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
 const chatTimeline = computed(() => [...chatHistory.value].reverse())
+const isVideoConversationActive = computed(() => isConversationMode.value)
 
 async function submitQuestion(questionOverride?: string) {
   const currentQuestion = questionOverride?.trim() ?? question.value.trim()
@@ -69,14 +70,16 @@ async function submitQuestion(questionOverride?: string) {
       image_base64: imageBase64,
       history: buildRecentContext()
     })
-    chatHistory.value = prependChatHistoryItem(chatHistory.value, {
+    const historyItem = {
       id: crypto.randomUUID(),
       question: currentQuestion,
       answer: latestAnswer.value.answer,
       image_base64: imageBase64,
       model: latestAnswer.value.model,
       created_at: latestAnswer.value.created_at
-    })
+    }
+    chatHistory.value = prependChatHistoryItem(chatHistory.value, historyItem)
+    selectedHistoryId.value = historyItem.id
     playLatestAnswer()
   } catch (error) {
     chatError.value = error instanceof Error ? error.message : '请求失败，请稍后重试。'
@@ -112,18 +115,15 @@ function playLatestAnswer() {
     speakText(latestAnswer.value.answer, {
       onStart: () => {
         isSpeaking.value = true
-        scheduleInterruptionRecognition()
       },
       onEnd: () => {
         isSpeaking.value = false
-        stopInterruptionRecognition()
         if (!pendingTranscript.value) {
           resumeConversationIfNeeded()
         }
       },
       onError: () => {
         isSpeaking.value = false
-        stopInterruptionRecognition()
         speechError.value = '语音播报失败，请使用文字回答。'
         if (!pendingTranscript.value) {
           resumeConversationIfNeeded()
@@ -138,7 +138,6 @@ function playLatestAnswer() {
 
 function stopAnswerSpeech() {
   stopSpeaking()
-  stopInterruptionRecognition()
   isSpeaking.value = false
   resumeConversationIfNeeded()
 }
@@ -146,10 +145,41 @@ function stopAnswerSpeech() {
 function clearHistory() {
   clearChatHistory()
   chatHistory.value = []
+  selectedHistoryId.value = undefined
   latestAnswer.value = null
   stopSpeaking()
-  stopInterruptionRecognition()
   isSpeaking.value = false
+}
+
+async function startVideoConversation() {
+  captureError.value = ''
+  chatError.value = ''
+  speechError.value = ''
+
+  try {
+    await cameraViewRef.value?.startCamera()
+  } catch (error) {
+    captureError.value = error instanceof Error ? error.message : '摄像头启动失败，请检查权限。'
+    return
+  }
+
+  if (!cameraViewRef.value?.isCameraActive) {
+    captureError.value = '摄像头没有成功开启，请检查浏览器权限。'
+    return
+  }
+
+  startConversationMode()
+}
+
+function stopVideoConversation() {
+  stopConversationMode()
+  stopSpeaking()
+  isSpeaking.value = false
+  cameraViewRef.value?.stopCamera()
+}
+
+function selectHistoryItem(id: string) {
+  selectedHistoryId.value = id
 }
 
 function startConversationMode() {
@@ -394,12 +424,20 @@ onBeforeUnmount(() => {
       </p>
     </header>
 
-    <section class="workspace" aria-label="视觉对话工作区">
-      <div class="video-column">
-        <CameraView ref="cameraViewRef" />
-      </div>
+    <section class="app-body" aria-label="视觉对话工作区">
+      <HistoryList
+        :items="chatHistory"
+        :active-id="selectedHistoryId"
+        @select="selectHistoryItem"
+        @clear="clearHistory"
+      />
 
-      <section class="chat-panel tool-panel" aria-labelledby="chat-title">
+      <section class="workspace">
+        <div class="video-column">
+          <CameraView ref="cameraViewRef" />
+        </div>
+
+        <section class="chat-panel tool-panel" aria-labelledby="chat-title">
         <div class="panel-header">
           <div>
             <p class="eyebrow">对话</p>
@@ -420,18 +458,18 @@ onBeforeUnmount(() => {
 
         <div class="conversation-bar">
           <div>
-            <p class="conversation-title">连续对话</p>
+            <p class="conversation-title">视频对话</p>
             <p class="conversation-status">
-              {{ isConversationMode ? conversationStatus : '开启后说完一句话会自动截图并提问' }}
+              {{ isVideoConversationActive ? conversationStatus : '点击一次即可开启摄像头和连续语音' }}
             </p>
           </div>
           <button
             class="primary-button"
             type="button"
             :disabled="!canContinuouslyListen"
-            @click="isConversationMode ? stopConversationMode() : startConversationMode()"
+            @click="isVideoConversationActive ? stopVideoConversation() : startVideoConversation()"
           >
-            {{ isConversationMode ? '结束连续对话' : '开始连续对话' }}
+            {{ isVideoConversationActive ? '结束视频对话' : '开始视频对话' }}
           </button>
         </div>
 
@@ -474,7 +512,23 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <VoiceInput v-model="question" />
+        <section class="text-fallback" aria-labelledby="text-fallback-title">
+          <div class="panel-header compact-panel-header">
+            <div>
+              <p class="eyebrow">备用输入</p>
+              <h2 id="text-fallback-title">文字提问</h2>
+            </div>
+            <div class="camera-status">可选</div>
+          </div>
+          <label class="question-label" for="question-input">你的问题</label>
+          <textarea
+            id="question-input"
+            v-model="question"
+            class="question-input"
+            rows="3"
+            placeholder="连续对话不可用时，可以在这里输入。"
+          />
+        </section>
 
         <div class="submit-bar">
           <button
@@ -486,9 +540,8 @@ onBeforeUnmount(() => {
             {{ isSubmitting ? '正在分析...' : '发送并分析当前画面' }}
           </button>
         </div>
+        </section>
       </section>
     </section>
-
-    <HistoryList :items="chatHistory" @clear="clearHistory" />
   </main>
 </template>
