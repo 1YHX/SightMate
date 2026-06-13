@@ -42,6 +42,8 @@ type WindowWithSpeechRecognition = Window &
     webkitSpeechRecognition?: SpeechRecognitionConstructor
   }
 
+let activeSpeechRunId = 0
+
 export function isSpeechRecognitionSupported() {
   const speechWindow = window as WindowWithSpeechRecognition
   return Boolean(speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition)
@@ -109,36 +111,69 @@ export function speakText(
     throw new Error('没有可播报的回答内容。')
   }
 
+  const speechRunId = activeSpeechRunId + 1
+  activeSpeechRunId = speechRunId
+  const chunks = splitSpeakableText(speechText)
+  const voice = findLivelyChineseVoice()
+  let chunkIndex = 0
+  let hasStarted = false
+
   window.speechSynthesis.cancel()
 
-  const utterance = new SpeechSynthesisUtterance(speechText)
-  utterance.lang = options.lang ?? 'zh-CN'
-  utterance.rate = 1.08
-  utterance.pitch = 1.12
-  utterance.voice = findLivelyChineseVoice()
+  const speakNextChunk = () => {
+    if (speechRunId !== activeSpeechRunId) {
+      return
+    }
 
-  utterance.onstart = () => {
-    options.onStart?.()
-  }
-
-  utterance.onend = () => {
-    options.onEnd?.()
-  }
-
-  utterance.onerror = (event) => {
-    const error = (event as SpeechSynthesisErrorEventWithReason).error
-    if (error === 'interrupted' || error === 'canceled') {
+    const chunk = chunks[chunkIndex]
+    if (!chunk) {
       options.onEnd?.()
       return
     }
 
-    options.onError?.()
+    const utterance = new SpeechSynthesisUtterance(chunk)
+    utterance.lang = options.lang ?? 'zh-CN'
+    utterance.rate = 1
+    utterance.pitch = 1.06
+    utterance.volume = 1
+    utterance.voice = voice
+
+    utterance.onstart = () => {
+      if (!hasStarted) {
+        hasStarted = true
+        options.onStart?.()
+      }
+    }
+
+    utterance.onend = () => {
+      chunkIndex += 1
+      window.setTimeout(speakNextChunk, 70)
+    }
+
+    utterance.onerror = (event) => {
+      if (speechRunId !== activeSpeechRunId) {
+        return
+      }
+
+      const error = (event as SpeechSynthesisErrorEventWithReason).error
+      if (error === 'interrupted' || error === 'canceled') {
+        return
+      }
+
+      options.onError?.()
+    }
+
+    window.speechSynthesis.speak(utterance)
   }
 
   window.setTimeout(() => {
+    if (speechRunId !== activeSpeechRunId) {
+      return
+    }
+
     window.speechSynthesis.resume()
-    window.speechSynthesis.speak(utterance)
-  }, 80)
+    speakNextChunk()
+  }, 120)
 }
 
 function toSpeakableText(text: string) {
@@ -156,6 +191,47 @@ function toSpeakableText(text: string) {
     .replace(/[>#|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function splitSpeakableText(text: string) {
+  const sentences = text.match(/[^。！？!?；;]+[。！？!?；;]?/g) ?? [text]
+  const chunks: string[] = []
+
+  sentences.forEach((sentence) => {
+    const cleanSentence = sentence.trim()
+    if (!cleanSentence) {
+      return
+    }
+
+    if (cleanSentence.length <= 80) {
+      chunks.push(cleanSentence)
+      return
+    }
+
+    const parts = cleanSentence.match(/[^，、,]+[，、,]?/g) ?? [cleanSentence]
+    let currentChunk = ''
+
+    parts.forEach((part) => {
+      const cleanPart = part.trim()
+      if (!cleanPart) {
+        return
+      }
+
+      if (currentChunk && currentChunk.length + cleanPart.length > 80) {
+        chunks.push(currentChunk)
+        currentChunk = cleanPart
+        return
+      }
+
+      currentChunk += cleanPart
+    })
+
+    if (currentChunk) {
+      chunks.push(currentChunk)
+    }
+  })
+
+  return chunks
 }
 
 function findLivelyChineseVoice() {
@@ -180,6 +256,7 @@ function findLivelyChineseVoice() {
 
 export function stopSpeaking() {
   if (isSpeechSynthesisSupported()) {
+    activeSpeechRunId += 1
     window.speechSynthesis.cancel()
   }
 }

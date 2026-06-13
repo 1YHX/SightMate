@@ -295,7 +295,7 @@ function startInterruptionRecognition() {
 
   const recognition = createSpeechRecognition('zh-CN', {
     continuous: true,
-    interimResults: true
+    interimResults: false
   })
 
   if (!recognition) {
@@ -309,10 +309,14 @@ function startInterruptionRecognition() {
 
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
       const result = event.results[index]
+      if (!result.isFinal) {
+        continue
+      }
+
       heardText += result[0]?.transcript.trim() ?? ''
     }
 
-    if (!heardText.trim()) {
+    if (heardText.trim().length < 2) {
       return
     }
 
@@ -348,7 +352,7 @@ function scheduleInterruptionRecognition() {
     if (isSpeaking.value) {
       startInterruptionRecognition()
     }
-  }, 800)
+  }, 1200)
 }
 
 function stopInterruptionRecognition() {
