@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { synthesizeSpeech } from './api/speech'
 import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
@@ -24,6 +24,7 @@ import {
 const projectName = 'SightMate'
 const question = ref('')
 const cameraViewRef = ref<InstanceType<typeof CameraView> | null>(null)
+const chatThreadRef = ref<HTMLElement | null>(null)
 const captureError = ref('')
 const chatError = ref('')
 const isSubmitting = ref(false)
@@ -51,6 +52,14 @@ const selectedSession = computed(() =>
 )
 const chatTimeline = computed(() => selectedSession.value?.turns ?? [])
 const isVideoConversationActive = computed(() => isConversationMode.value)
+
+watch(
+  () => [selectedSessionId.value, chatTimeline.value.length],
+  () => {
+    void scrollChatToBottom()
+  },
+  { flush: 'post' }
+)
 
 async function submitQuestion(questionOverride?: string) {
   const currentQuestion = questionOverride?.trim() ?? question.value.trim()
@@ -88,6 +97,7 @@ async function submitQuestion(questionOverride?: string) {
     const result = addTurnToSession(chatSessions.value, selectedSessionId.value, historyItem)
     chatSessions.value = result.sessions
     selectedSessionId.value = result.sessionId
+    await scrollChatToBottom()
     playLatestAnswer()
   } catch (error) {
     chatError.value = error instanceof Error ? error.message : '请求失败，请稍后重试。'
@@ -117,6 +127,7 @@ function playLatestAnswer() {
   }
 
   speechError.value = ''
+  void scrollChatToBottom()
   void playProfessionalAnswer(latestAnswer.value.answer)
 }
 
@@ -203,6 +214,7 @@ function startNewSession() {
   selectedSessionId.value = result.sessionId
   latestAnswer.value = null
   question.value = ''
+  void scrollChatToBottom()
 }
 
 async function startVideoConversation() {
@@ -243,6 +255,20 @@ function selectHistoryItem(id: string) {
       created_at: lastTurn.created_at
     }
   }
+  void scrollChatToBottom()
+}
+
+async function scrollChatToBottom() {
+  await nextTick()
+  const chatThread = chatThreadRef.value
+  if (!chatThread) {
+    return
+  }
+
+  chatThread.scrollTo({
+    top: chatThread.scrollHeight,
+    behavior: 'smooth'
+  })
 }
 
 function startConversationMode() {
@@ -540,7 +566,12 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="chatTimeline.length" class="chat-thread" aria-label="当前聊天记录">
+        <div
+          v-if="chatTimeline.length"
+          ref="chatThreadRef"
+          class="chat-thread"
+          aria-label="当前聊天记录"
+        >
           <div v-for="item in chatTimeline" :key="item.id" class="chat-turn">
             <div class="chat-bubble user-bubble">
               <p>{{ item.question }}</p>
