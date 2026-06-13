@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { synthesizeSpeech } from './api/speech'
 import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
 import HistoryList from './components/HistoryList.vue'
-import type { ChatHistoryMessage, ChatHistoryItem, VisionChatResponse } from './types/chat'
+import type { ChatHistoryMessage, ChatSession, ChatTurn, VisionChatResponse } from './types/chat'
 import {
   createSpeechRecognition,
   getSpeechErrorMessage,
@@ -14,9 +15,10 @@ import {
   type BrowserSpeechRecognition
 } from './utils/speech'
 import {
+  addTurnToSession,
   clearChatHistory,
-  loadChatHistory,
-  prependChatHistoryItem
+  createEmptySession,
+  loadChatSessions
 } from './utils/storage'
 
 const projectName = 'SightMate'
@@ -28,21 +30,26 @@ const isSubmitting = ref(false)
 const latestAnswer = ref<VisionChatResponse | null>(null)
 const isSpeaking = ref(false)
 const speechError = ref('')
-const canSpeak = isSpeechSynthesisSupported()
+const canBrowserSpeak = isSpeechSynthesisSupported()
+const canSpeak = true
 const canContinuouslyListen = isSpeechRecognitionSupported()
-const chatHistory = ref<ChatHistoryItem[]>(loadChatHistory())
+const chatSessions = ref<ChatSession[]>(loadChatSessions())
 const isConversationMode = ref(false)
 const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
 const interruptionRecognition = ref<BrowserSpeechRecognition | null>(null)
 const conversationStatus = ref('未开启')
 const pendingTranscript = ref('')
-const selectedHistoryId = ref<string | undefined>(chatHistory.value[0]?.id)
+const selectedSessionId = ref<string | undefined>(chatSessions.value[0]?.id)
+const professionalAudio = ref<HTMLAudioElement | null>(null)
 let autoSubmitTimer: number | undefined
 let interruptionStartTimer: number | undefined
 
 const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
-const chatTimeline = computed(() => [...chatHistory.value].reverse())
+const selectedSession = computed(() =>
+  chatSessions.value.find((session) => session.id === selectedSessionId.value) ?? chatSessions.value[0]
+)
+const chatTimeline = computed(() => selectedSession.value?.turns ?? [])
 const isVideoConversationActive = computed(() => isConversationMode.value)
 
 async function submitQuestion(questionOverride?: string) {
@@ -70,7 +77,7 @@ async function submitQuestion(questionOverride?: string) {
       image_base64: imageBase64,
       history: buildRecentContext()
     })
-    const historyItem = {
+    const historyItem: ChatTurn = {
       id: crypto.randomUUID(),
       question: currentQuestion,
       answer: latestAnswer.value.answer,
@@ -78,8 +85,9 @@ async function submitQuestion(questionOverride?: string) {
       model: latestAnswer.value.model,
       created_at: latestAnswer.value.created_at
     }
-    chatHistory.value = prependChatHistoryItem(chatHistory.value, historyItem)
-    selectedHistoryId.value = historyItem.id
+    const result = addTurnToSession(chatSessions.value, selectedSessionId.value, historyItem)
+    chatSessions.value = result.sessions
+    selectedSessionId.value = result.sessionId
     playLatestAnswer()
   } catch (error) {
     chatError.value = error instanceof Error ? error.message : '请求失败，请稍后重试。'
@@ -89,9 +97,8 @@ async function submitQuestion(questionOverride?: string) {
 }
 
 function buildRecentContext(): ChatHistoryMessage[] {
-  return chatHistory.value
-    .slice(0, 3)
-    .reverse()
+  return (selectedSession.value?.turns ?? [])
+    .slice(-3)
     .flatMap((item) => [
       {
         role: 'user' as const,
@@ -110,9 +117,38 @@ function playLatestAnswer() {
   }
 
   speechError.value = ''
+  void playProfessionalAnswer(latestAnswer.value.answer)
+}
+
+async function playProfessionalAnswer(answer: string) {
+  stopSpeaking()
+  stopProfessionalAudio()
+  isSpeaking.value = true
 
   try {
-    speakText(latestAnswer.value.answer, {
+    const speech = await synthesizeSpeech({ text: answer })
+    const audio = new Audio(speech.audio_url)
+    professionalAudio.value = audio
+
+    audio.onended = () => {
+      professionalAudio.value = null
+      isSpeaking.value = false
+      resumeConversationIfNeeded()
+    }
+    audio.onerror = () => {
+      professionalAudio.value = null
+      playBrowserAnswer(answer)
+    }
+
+    await audio.play()
+  } catch {
+    playBrowserAnswer(answer)
+  }
+}
+
+function playBrowserAnswer(answer: string) {
+  try {
+    speakText(answer, {
       onStart: () => {
         isSpeaking.value = true
       },
@@ -136,19 +172,37 @@ function playLatestAnswer() {
   }
 }
 
+function stopProfessionalAudio() {
+  professionalAudio.value?.pause()
+  if (professionalAudio.value) {
+    professionalAudio.value.currentTime = 0
+  }
+  professionalAudio.value = null
+}
+
 function stopAnswerSpeech() {
   stopSpeaking()
+  stopProfessionalAudio()
   isSpeaking.value = false
   resumeConversationIfNeeded()
 }
 
 function clearHistory() {
   clearChatHistory()
-  chatHistory.value = []
-  selectedHistoryId.value = undefined
+  chatSessions.value = []
+  selectedSessionId.value = undefined
   latestAnswer.value = null
   stopSpeaking()
+  stopProfessionalAudio()
   isSpeaking.value = false
+}
+
+function startNewSession() {
+  const result = createEmptySession(chatSessions.value)
+  chatSessions.value = result.sessions
+  selectedSessionId.value = result.sessionId
+  latestAnswer.value = null
+  question.value = ''
 }
 
 async function startVideoConversation() {
@@ -179,7 +233,16 @@ function stopVideoConversation() {
 }
 
 function selectHistoryItem(id: string) {
-  selectedHistoryId.value = id
+  selectedSessionId.value = id
+  const session = chatSessions.value.find((item) => item.id === id)
+  const lastTurn = session?.turns[session.turns.length - 1]
+  if (lastTurn) {
+    latestAnswer.value = {
+      answer: lastTurn.answer,
+      model: lastTurn.model,
+      created_at: lastTurn.created_at
+    }
+  }
 }
 
 function startConversationMode() {
@@ -409,6 +472,7 @@ onBeforeUnmount(() => {
   stopConversationMode()
   clearAutoSubmitTimer()
   stopSpeaking()
+  stopProfessionalAudio()
 })
 </script>
 
@@ -426,10 +490,11 @@ onBeforeUnmount(() => {
 
     <section class="app-body" aria-label="视觉对话工作区">
       <HistoryList
-        :items="chatHistory"
-        :active-id="selectedHistoryId"
+        :items="chatSessions"
+        :active-id="selectedSessionId"
         @select="selectHistoryItem"
         @clear="clearHistory"
+        @new-session="startNewSession"
       />
 
       <section class="workspace">
@@ -454,7 +519,9 @@ onBeforeUnmount(() => {
           <p v-if="speechError" class="error-message">{{ speechError }}</p>
         </div>
 
-        <p v-if="!canSpeak" class="hint-message">当前浏览器不支持语音播报，请阅读文字回答。</p>
+        <p v-if="!canBrowserSpeak" class="hint-message">
+          当前浏览器不支持本地语音回退，将优先使用云端语音播报。
+        </p>
 
         <div class="conversation-bar">
           <div>

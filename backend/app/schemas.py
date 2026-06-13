@@ -20,3 +20,13 @@ class VisionChatResponse(BaseModel):
     answer: str
     model: str
     created_at: str
+
+
+class SpeechSynthesisRequest(BaseModel):
+    text: str = Field(..., min_length=1, examples=["你好，我是 SightMate。"])
+
+
+class SpeechSynthesisResponse(BaseModel):
+    audio_url: str
+    format: str
+    model: str
