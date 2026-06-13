@@ -102,6 +102,12 @@ export function createEmptySession(sessions: ChatSession[]) {
   return { sessions: nextSessions, sessionId: newSession.id }
 }
 
+export function deleteChatSession(sessions: ChatSession[], sessionId: string) {
+  const nextSessions = sessions.filter((session) => session.id !== sessionId)
+  saveChatSessions(nextSessions)
+  return nextSessions
+}
+
 function createSessionFromTurn(turn: ChatTurn) {
   return createChatSession(turn)
 }

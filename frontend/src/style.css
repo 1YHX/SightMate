@@ -341,12 +341,18 @@ h2 {
   min-width: 0;
 }
 
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .history-summary-button {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
-  margin-top: 8px;
   padding: 0;
   color: #18202f;
   background: transparent;
@@ -356,6 +362,17 @@ h2 {
 
 .history-summary-button.active {
   color: #226f54;
+}
+
+.history-delete-button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #fff1f2;
+  color: #b42335;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .history-question,

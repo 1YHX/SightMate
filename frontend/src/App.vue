@@ -18,6 +18,7 @@ import {
   addTurnToSession,
   clearChatHistory,
   createEmptySession,
+  deleteChatSession,
   loadChatSessions
 } from './utils/storage'
 
@@ -213,6 +214,26 @@ function startNewSession() {
   selectedSessionId.value = result.sessionId
   latestAnswer.value = null
   question.value = ''
+  void scrollChatToBottom()
+}
+
+function deleteSession(id: string) {
+  const nextSessions = deleteChatSession(chatSessions.value, id)
+  chatSessions.value = nextSessions
+
+  if (selectedSessionId.value === id) {
+    const nextSession = nextSessions[0]
+    selectedSessionId.value = nextSession?.id
+    const lastTurn = nextSession?.turns[nextSession.turns.length - 1]
+    latestAnswer.value = lastTurn
+      ? {
+          answer: lastTurn.answer,
+          model: lastTurn.model,
+          created_at: lastTurn.created_at
+        }
+      : null
+  }
+
   void scrollChatToBottom()
 }
 
@@ -518,6 +539,7 @@ onBeforeUnmount(() => {
         :items="chatSessions"
         :active-id="selectedSessionId"
         @select="selectHistoryItem"
+        @delete="deleteSession"
         @clear="clearHistory"
         @new-session="startNewSession"
       />

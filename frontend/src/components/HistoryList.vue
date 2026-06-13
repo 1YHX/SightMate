@@ -9,6 +9,7 @@ defineProps<{
 
 defineEmits<{
   clear: []
+  delete: [id: string]
   newSession: []
   select: [id: string]
 }>()
@@ -63,15 +64,26 @@ function summarize(text: string, maxLength = 32) {
             <span>{{ item.updated_at }}</span>
             <span>{{ item.turns.length }} 轮</span>
           </div>
-          <button
-            class="history-summary-button"
-            type="button"
-            :class="{ active: activeId === item.id }"
-            @click="$emit('select', item.id); toggleItem(item.id)"
-          >
-            <span>{{ summarize(item.title) }}</span>
-            <span>{{ expandedIds.has(item.id) ? '收起' : '展开' }}</span>
-          </button>
+          <div class="history-row">
+            <button
+              class="history-summary-button"
+              type="button"
+              :class="{ active: activeId === item.id }"
+              @click="$emit('select', item.id); toggleItem(item.id)"
+            >
+              <span>{{ summarize(item.title) }}</span>
+              <span>{{ expandedIds.has(item.id) ? '收起' : '展开' }}</span>
+            </button>
+            <button
+              class="history-delete-button"
+              type="button"
+              aria-label="删除对话"
+              title="删除对话"
+              @click.stop="$emit('delete', item.id)"
+            >
+              删除
+            </button>
+          </div>
           <div v-if="expandedIds.has(item.id)" class="history-detail">
             <p
               v-for="turn in item.turns.slice(-3)"
