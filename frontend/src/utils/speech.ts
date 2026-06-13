@@ -161,13 +161,13 @@ function toSpeakableText(text: string) {
 function toBriefSpeakableText(text: string) {
   const speakableText = toSpeakableText(text)
   const sentences = speakableText.match(/[^。！？!?]+[。！？!?]?/g) ?? [speakableText]
-  const briefText = sentences.slice(0, 2).join('').trim()
+  const briefText = sentences.slice(0, 4).join('').trim()
 
-  if (briefText.length <= 120) {
+  if (briefText.length <= 260) {
     return briefText
   }
 
-  return `${briefText.slice(0, 120)}。`
+  return `${briefText.slice(0, 260).replace(/[，、；：,.，\s]+$/, '')}。`
 }
 
 function findLivelyChineseVoice() {
