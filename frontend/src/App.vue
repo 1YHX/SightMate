@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  addChatTurn,
+  clearChatSessions,
+  createChatSession,
+  deleteChatSession,
+  listChatSessions
+} from './api/sessions'
 import { synthesizeSpeech } from './api/speech'
 import { chatWithVision } from './api/vision'
 import CameraView from './components/CameraView.vue'
@@ -14,13 +21,7 @@ import {
   stopSpeaking,
   type BrowserSpeechRecognition
 } from './utils/speech'
-import {
-  addTurnToSession,
-  clearChatHistory,
-  createEmptySession,
-  deleteChatSession,
-  loadChatSessions
-} from './utils/storage'
+import { clearLocalChatHistory, loadLocalChatSessions } from './utils/storage'
 
 const projectName = 'SightMate'
 const question = ref('')
@@ -35,7 +36,7 @@ const speechError = ref('')
 const canBrowserSpeak = isSpeechSynthesisSupported()
 const canSpeak = true
 const canContinuouslyListen = isSpeechRecognitionSupported()
-const chatSessions = ref<ChatSession[]>(loadChatSessions())
+const chatSessions = ref<ChatSession[]>([])
 const isConversationMode = ref(false)
 const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
 const interruptionRecognition = ref<BrowserSpeechRecognition | null>(null)
@@ -53,6 +54,75 @@ const selectedSession = computed(() =>
 )
 const chatTimeline = computed(() => selectedSession.value?.turns ?? [])
 const isVideoConversationActive = computed(() => isConversationMode.value)
+
+onMounted(() => {
+  void loadPersistedSessions()
+})
+
+async function loadPersistedSessions() {
+  try {
+    const persistedSessions = await listChatSessions()
+    if (persistedSessions.length) {
+      chatSessions.value = persistedSessions
+      selectedSessionId.value = persistedSessions[0]?.id
+      return
+    }
+
+    const legacySessions = loadLocalChatSessions()
+    if (!legacySessions.length) {
+      return
+    }
+
+    await migrateLocalSessionsToSQLite(legacySessions)
+    clearLocalChatHistory()
+  } catch (error) {
+    chatError.value = error instanceof Error ? error.message : '历史会话读取失败。'
+  }
+}
+
+async function migrateLocalSessionsToSQLite(legacySessions: ChatSession[]) {
+  const importedSessions: ChatSession[] = []
+
+  for (const legacySession of legacySessions) {
+    let importedSession = await createChatSession(legacySession.title)
+    for (const turn of legacySession.turns) {
+      importedSession = await addChatTurn(importedSession.id, turn)
+    }
+    importedSessions.push(importedSession)
+  }
+
+  chatSessions.value = importedSessions
+  selectedSessionId.value = importedSessions[0]?.id
+}
+
+async function ensureSelectedSession() {
+  if (selectedSessionId.value) {
+    return selectedSessionId.value
+  }
+
+  const newSession = await createChatSession()
+  upsertSession(newSession)
+  selectedSessionId.value = newSession.id
+  return newSession.id
+}
+
+function upsertSession(session: ChatSession) {
+  chatSessions.value = [
+    session,
+    ...chatSessions.value.filter((item) => item.id !== session.id)
+  ]
+}
+
+async function clearHistoryFromDatabase() {
+  await clearChatSessions()
+  chatSessions.value = []
+  selectedSessionId.value = undefined
+  latestAnswer.value = null
+  capturedFrameForCurrentTurn.value = null
+  stopSpeaking()
+  stopProfessionalAudio()
+  isSpeaking.value = false
+}
 
 watch(
   () => [selectedSessionId.value, chatTimeline.value.length],
@@ -96,9 +166,10 @@ async function submitQuestion(questionOverride?: string) {
       model: latestAnswer.value.model,
       created_at: latestAnswer.value.created_at
     }
-    const result = addTurnToSession(chatSessions.value, selectedSessionId.value, historyItem)
-    chatSessions.value = result.sessions
-    selectedSessionId.value = result.sessionId
+    const targetSessionId = await ensureSelectedSession()
+    const updatedSession = await addChatTurn(targetSessionId, historyItem)
+    upsertSession(updatedSession)
+    selectedSessionId.value = updatedSession.id
     await scrollChatToBottom()
     playLatestAnswer()
   } catch (error) {
@@ -202,28 +273,22 @@ function stopAnswerSpeech() {
 }
 
 function clearHistory() {
-  clearChatHistory()
-  chatSessions.value = []
-  selectedSessionId.value = undefined
-  latestAnswer.value = null
-  capturedFrameForCurrentTurn.value = null
-  stopSpeaking()
-  stopProfessionalAudio()
-  isSpeaking.value = false
+  void clearHistoryFromDatabase()
 }
 
-function startNewSession() {
-  const result = createEmptySession(chatSessions.value)
-  chatSessions.value = result.sessions
-  selectedSessionId.value = result.sessionId
+async function startNewSession() {
+  const newSession = await createChatSession()
+  upsertSession(newSession)
+  selectedSessionId.value = newSession.id
   latestAnswer.value = null
   question.value = ''
   capturedFrameForCurrentTurn.value = null
   void scrollChatToBottom()
 }
 
-function deleteSession(id: string) {
-  const nextSessions = deleteChatSession(chatSessions.value, id)
+async function deleteSession(id: string) {
+  await deleteChatSession(id)
+  const nextSessions = chatSessions.value.filter((session) => session.id !== id)
   chatSessions.value = nextSessions
   capturedFrameForCurrentTurn.value = null
 

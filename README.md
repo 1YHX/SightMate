@@ -19,7 +19,7 @@ AI 视觉对话助手。
 - 前端展示 AI 回答。
 - 阿里云 Qwen-TTS 专业语音播报 AI 回答，失败时回退浏览器播报。
 - 支持停止播报和重新播放。
-- 使用 localStorage 保存最近 20 个对话会话，每个会话包含多轮问答。
+- 使用 SQLite 保存最近 20 个对话会话，每个会话包含多轮问答。
 - 请求模型时只传最近 3 轮上下文。
 - 支持清空历史记录。
 - 提供 loading、错误提示和隐私提示。
@@ -30,7 +30,7 @@ AI 视觉对话助手。
 - 后端：FastAPI、Python
 - 模型服务：阿里云百炼视觉理解模型，默认 `qwen3.7-plus`
 - 语音能力：阿里云 Qwen-TTS、浏览器 Web Speech API、`speechSynthesis` 回退
-- 历史存储：浏览器 localStorage
+- 历史存储：SQLite
 
 ## 启动方式
 
@@ -55,6 +55,7 @@ ALIYUN_TTS_MODEL=qwen3-tts-flash
 ALIYUN_TTS_VOICE=Cherry
 BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
+DATABASE_PATH=data/sightmate.sqlite3
 ```
 
 启动后端：
@@ -103,6 +104,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
 | `ALIYUN_TTS_VOICE` | 语音合成音色，默认 `Cherry` |
 | `BACKEND_HOST` | 后端监听地址 |
 | `BACKEND_PORT` | 后端监听端口 |
+| `DATABASE_PATH` | SQLite 数据库文件路径，默认 `data/sightmate.sqlite3` |
 
 ## 第三方依赖
 
@@ -136,14 +138,14 @@ POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
 
 SightMate 不上传连续视频流。摄像头画面只在浏览器中实时预览，只有用户说完一句话触发连续对话请求，或点击发送问题时，系统才截取当前帧并发送给后端模型服务。前端不会向用户展示截图预览，体验上更接近视频对话，但底层仍是按需单帧上传。
 
-历史记录以“对话会话”的形式保存在浏览器 localStorage 中，每个会话包含多轮问答，不上传到云数据库。清空浏览器站点数据或点击清空历史会删除本地历史记录。
+历史记录以“对话会话”的形式保存在后端 SQLite 中，每个会话包含多轮问答，不上传到云数据库。SQLite 文件默认位于 `backend/data/sightmate.sqlite3`，不会提交到 GitHub。点击清空历史会删除本地 SQLite 中的历史记录。
 
 ## 成本控制说明
 
 - 不上传连续视频流，只在提问触发时无感截取当前帧。
 - 截图最长边限制为 1024px，JPEG 质量约 0.8。
 - 语音识别使用浏览器能力；语音播报优先使用阿里云 Qwen-TTS，失败时回退浏览器能力。
-- 历史记录保存在 localStorage，不引入云数据库。
+- 历史记录保存在 SQLite，不引入云数据库。
 - 请求模型时只带最近 3 轮上下文。
 - loading 期间禁用发送按钮，避免重复调用模型。
 

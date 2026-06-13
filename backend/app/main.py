@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import speech, vision
+from app.routers import sessions, speech, vision
 
 
 app = FastAPI(title="SightMate API", version="0.1.0")
@@ -17,6 +17,7 @@ app.add_middleware(
 
 app.include_router(vision.router)
 app.include_router(speech.router)
+app.include_router(sessions.router)
 
 
 @app.get("/health")

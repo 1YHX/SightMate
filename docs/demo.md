@@ -38,6 +38,7 @@ ALIYUN_VISION_MODEL=qwen3.7-plus
 ALIYUN_TTS_BASE_URL=https://dashscope.aliyuncs.com/api/v1
 ALIYUN_TTS_MODEL=qwen3-tts-flash
 ALIYUN_TTS_VOICE=Cherry
+DATABASE_PATH=data/sightmate.sqlite3
 ```
 
 不要在视频中展示真实 API Key。

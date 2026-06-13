@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     aliyun_tts_voice: str = "Cherry"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
+    database_path: str = "data/sightmate.sqlite3"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
