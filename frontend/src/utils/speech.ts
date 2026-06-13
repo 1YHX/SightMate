@@ -76,17 +76,17 @@ export function getSpeechErrorMessage(error: string) {
   switch (error) {
     case 'not-allowed':
     case 'service-not-allowed':
-      return '麦克风权限被拒绝，请允许浏览器使用麦克风，或直接使用文字输入。'
+      return '麦克风权限被拒绝，请允许浏览器使用麦克风后重新开始视频对话。'
     case 'no-speech':
-      return '没有识别到语音，请靠近麦克风重试，或直接使用文字输入。'
+      return '没有识别到语音，请靠近麦克风后继续说话。'
     case 'audio-capture':
-      return '没有找到可用麦克风，请检查设备连接，或直接使用文字输入。'
+      return '没有找到可用麦克风，请检查设备连接后重新开始视频对话。'
     case 'network':
-      return '语音识别服务暂时不可用，请稍后重试，或直接使用文字输入。'
+      return '语音识别服务暂时不可用，请稍后重新开始视频对话。'
     case 'aborted':
       return ''
     default:
-      return '语音识别失败，请重试，或直接使用文字输入。'
+      return '语音识别失败，请重新开始视频对话。'
   }
 }
 

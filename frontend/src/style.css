@@ -96,10 +96,6 @@ button:disabled {
   margin-bottom: 12px;
 }
 
-.text-fallback {
-  margin-top: 18px;
-}
-
 .compact-panel-header {
   margin-bottom: 10px;
 }
@@ -225,32 +221,6 @@ h2 {
 
 .interim-text {
   color: #226f54;
-}
-
-.question-label {
-  display: block;
-  margin-bottom: 8px;
-  color: #344054;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.question-input {
-  width: 100%;
-  resize: vertical;
-  box-sizing: border-box;
-  padding: 12px 14px;
-  border: 1px solid #cfd8e5;
-  border-radius: 8px;
-  color: #18202f;
-  background: #ffffff;
-  line-height: 1.5;
-  outline: none;
-}
-
-.question-input:focus {
-  border-color: #226f54;
-  box-shadow: 0 0 0 3px rgba(34, 111, 84, 0.14);
 }
 
 .empty-answer {
@@ -421,12 +391,6 @@ h2 {
   margin-top: 18px;
 }
 
-.submit-bar {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
-}
-
 .primary-button,
 .secondary-button {
   min-width: 120px;
@@ -463,7 +427,6 @@ h2 {
   .app-header,
   .panel-header,
   .camera-actions,
-  .submit-bar,
   .playback-bar,
   .conversation-bar {
     align-items: stretch;

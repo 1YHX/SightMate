@@ -45,7 +45,6 @@ const professionalAudio = ref<HTMLAudioElement | null>(null)
 let autoSubmitTimer: number | undefined
 let interruptionStartTimer: number | undefined
 
-const canSubmit = computed(() => question.value.trim().length > 0 && !isSubmitting.value)
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
 const selectedSession = computed(() =>
   chatSessions.value.find((session) => session.id === selectedSessionId.value) ?? chatSessions.value[0]
@@ -589,7 +588,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <p v-else class="empty-answer">打开摄像头后，用语音或文字提问，聊天记录会显示在这里。</p>
+        <p v-else class="empty-answer">点击开始视频对话后，直接说话提问，聊天记录会显示在这里。</p>
 
         <div v-if="latestAnswer" class="playback-bar">
           <button
@@ -610,34 +609,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <section class="text-fallback" aria-labelledby="text-fallback-title">
-          <div class="panel-header compact-panel-header">
-            <div>
-              <p class="eyebrow">备用输入</p>
-              <h2 id="text-fallback-title">文字提问</h2>
-            </div>
-            <div class="camera-status">可选</div>
-          </div>
-          <label class="question-label" for="question-input">你的问题</label>
-          <textarea
-            id="question-input"
-            v-model="question"
-            class="question-input"
-            rows="3"
-            placeholder="连续对话不可用时，可以在这里输入。"
-          />
-        </section>
-
-        <div class="submit-bar">
-          <button
-            class="primary-button"
-            type="button"
-            :disabled="!canSubmit"
-            @click="() => submitQuestion()"
-          >
-            {{ isSubmitting ? '正在分析...' : '发送并分析当前画面' }}
-          </button>
-        </div>
         </section>
       </section>
     </section>
