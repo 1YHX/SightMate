@@ -2,7 +2,6 @@ import type { ChatSession, ChatTurn } from '../types/chat'
 
 const CHAT_HISTORY_KEY = 'sightmate.chatHistory'
 const CHAT_SESSIONS_KEY = 'sightmate.chatSessions'
-const MAX_SESSIONS = 20
 
 export function loadLocalChatSessions() {
   try {
@@ -10,7 +9,7 @@ export function loadLocalChatSessions() {
     if (sessionsValue) {
       const parsedValue = JSON.parse(sessionsValue)
       if (Array.isArray(parsedValue)) {
-        return parsedValue.filter(isChatSession).slice(0, MAX_SESSIONS)
+        return parsedValue.filter(isChatSession)
       }
     }
 
@@ -27,7 +26,6 @@ export function loadLocalChatSessions() {
     return legacyItems
       .filter(isChatTurn)
       .map((item) => createSessionFromTurn(item))
-      .slice(0, MAX_SESSIONS)
   } catch {
     return []
   }

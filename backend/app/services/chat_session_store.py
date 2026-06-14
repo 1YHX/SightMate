@@ -8,10 +8,6 @@ from app.config import settings
 from app.schemas import ChatSession, ChatTurn
 
 
-MAX_SESSIONS = 20
-MAX_TURNS_PER_SESSION = 100
-
-
 class ChatSessionStore:
     def __init__(self, database_path: str = settings.database_path) -> None:
         self.database_path = Path(database_path)
@@ -27,9 +23,7 @@ class ChatSessionStore:
                 SELECT id, title, created_at, updated_at
                 FROM chat_sessions
                 ORDER BY updated_at DESC
-                LIMIT ?
-                """,
-                (MAX_SESSIONS,),
+                """
             ).fetchall()
 
             sessions = []
@@ -40,9 +34,8 @@ class ChatSessionStore:
                     FROM chat_turns
                     WHERE session_id = ?
                     ORDER BY turn_index ASC
-                    LIMIT ?
                     """,
-                    (session_row["id"], MAX_TURNS_PER_SESSION),
+                    (session_row["id"],),
                 ).fetchall()
                 sessions.append(self._build_session(session_row, turn_rows))
 
@@ -141,7 +134,6 @@ class ChatSessionStore:
                 "UPDATE chat_sessions SET updated_at = ? WHERE id = ?",
                 (turn.created_at, target_session_id),
             )
-            self._trim_turns(connection, target_session_id)
             connection.commit()
 
             session_row = connection.execute(
@@ -215,21 +207,6 @@ class ChatSessionStore:
                 """
             )
             connection.commit()
-
-    def _trim_turns(self, connection: sqlite3.Connection, session_id: str) -> None:
-        connection.execute(
-            """
-            DELETE FROM chat_turns
-            WHERE id IN (
-                SELECT id
-                FROM chat_turns
-                WHERE session_id = ?
-                ORDER BY turn_index DESC
-                LIMIT -1 OFFSET ?
-            )
-            """,
-            (session_id, MAX_TURNS_PER_SESSION),
-        )
 
     def _build_session(
         self,
