@@ -31,6 +31,7 @@ class RealtimeProxyService:
         async with websockets.connect(
             realtime_url,
             additional_headers={"Authorization": f"Bearer {self.api_key}"},
+            proxy=None,
             ping_interval=20,
             ping_timeout=20,
         ) as upstream_websocket:
