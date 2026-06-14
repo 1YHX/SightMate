@@ -28,7 +28,7 @@ export class RealtimeClient {
   private playbackContext: AudioContext | null = null
   private nextPlaybackTime = 0
   private assistantText = ''
-  private hasSentAudio = false
+  private hasServerAcceptedAudio = false
 
   constructor(private readonly options: RealtimeClientOptions = {}) {}
 
@@ -71,11 +71,11 @@ export class RealtimeClient {
     this.playbackContext = null
     this.nextPlaybackTime = 0
     this.assistantText = ''
-    this.hasSentAudio = false
+    this.hasServerAcceptedAudio = false
   }
 
   sendVideoFrame(dataUrl: string) {
-    if (!this.hasSentAudio) {
+    if (!this.hasServerAcceptedAudio) {
       return
     }
 
@@ -152,7 +152,6 @@ export class RealtimeClient {
         type: 'input_audio_buffer.append',
         audio: arrayBufferToBase64(pcm16.buffer)
       })
-      this.hasSentAudio = true
     }
 
     this.sourceNode.connect(this.scriptProcessor)
@@ -162,13 +161,16 @@ export class RealtimeClient {
   private handleServerEvent(message: Record<string, unknown>) {
     switch (message.type) {
       case 'input_audio_buffer.speech_started':
+        this.hasServerAcceptedAudio = true
         this.options.onStatus?.('听到你说话')
         break
       case 'input_audio_buffer.speech_stopped':
+        this.hasServerAcceptedAudio = true
         this.options.onStatus?.('正在思考')
         break
       case 'conversation.item.input_audio_transcription.completed':
         if (typeof message.transcript === 'string') {
+          this.hasServerAcceptedAudio = true
           this.options.onRecovered?.()
           this.options.onUserTranscript?.(message.transcript)
         }
@@ -177,6 +179,7 @@ export class RealtimeClient {
         if (typeof message.text === 'string' || typeof message.stash === 'string') {
           const text = typeof message.text === 'string' ? message.text : ''
           const stash = typeof message.stash === 'string' ? message.stash : ''
+          this.hasServerAcceptedAudio = true
           this.options.onRecovered?.()
           this.options.onUserTranscript?.(`${text}${stash}`)
         }
@@ -203,6 +206,10 @@ export class RealtimeClient {
         }
         break
       case 'error':
+        if (isAppendImageBeforeAudioError(message)) {
+          this.hasServerAcceptedAudio = false
+          return
+        }
         this.options.onError?.(getRealtimeErrorMessage(message))
         break
     }
@@ -304,4 +311,9 @@ function getRealtimeErrorMessage(message: Record<string, unknown>) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isAppendImageBeforeAudioError(message: Record<string, unknown>) {
+  const errorMessage = getRealtimeErrorMessage(message).toLowerCase()
+  return errorMessage.includes('append image before append audio')
 }

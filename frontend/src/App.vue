@@ -466,9 +466,9 @@ async function scrollChatToBottom() {
     return
   }
 
-  chatThread.scrollTo({
-    top: chatThread.scrollHeight,
-    behavior: 'smooth'
+  chatThread.scrollTop = chatThread.scrollHeight
+  window.requestAnimationFrame(() => {
+    chatThread.scrollTop = chatThread.scrollHeight
   })
 }
 

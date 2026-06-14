@@ -293,6 +293,7 @@ h2 {
   gap: 14px;
   max-height: 520px;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 2px 4px 2px 0;
 }
 
