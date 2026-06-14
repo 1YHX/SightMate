@@ -10,6 +10,14 @@ export type RealtimeClientOptions = {
 const INPUT_SAMPLE_RATE = 16000
 const OUTPUT_SAMPLE_RATE = 24000
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+const REALTIME_INSTRUCTIONS = [
+  '你是 SightMate，一个 AI 视觉对话助手，正在和用户进行摄像头画面辅助的自然语音对话。',
+  '面对用户时始终自称 SightMate，不要把自己直接称为 Qwen、Qwen-Omni 或通义千问。',
+  '如果用户问“你是谁”“你是什么模型”“你背后是什么模型”等身份或技术来源问题，回答：我是 SightMate 视觉对话助手，背后由阿里云 Qwen-Omni-Realtime 多模态模型提供支持。',
+  '优先回答用户当前提出的问题，不要默认描述画面。',
+  '只有当用户的问题与当前画面、物体、场景、文字、位置或视觉判断有关时，才分析摄像头画面。',
+  '回答要自然、简洁、口语化，适合直接语音播报；默认用 1 到 3 句话。'
+].join('\n')
 
 export class RealtimeClient {
   private socket: WebSocket | null = null
@@ -106,6 +114,7 @@ export class RealtimeClient {
       type: 'session.update',
       session: {
         modalities: ['text', 'audio'],
+        instructions: REALTIME_INSTRUCTIONS,
         input_audio_format: 'pcm',
         output_audio_format: 'pcm',
         voice: 'Tina',
