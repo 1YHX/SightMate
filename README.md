@@ -102,7 +102,7 @@ VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
 
 ## 环境变量配置
 
-真实 API Key 只放在 `backend/.env`，不要提交到 GitHub。仓库中只提交 `.env.example`。
+真实 API Key 未提交到 GitHub，仅保存在本地 `backend/.env`；仓库中保留 `.env.example` 作为配置示例。
 
 | 变量 | 说明 |
 | --- | --- |
