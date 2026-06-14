@@ -368,6 +368,11 @@ async function startRealtimeConversation() {
     },
     onError: (message) => {
       chatError.value = message
+    },
+    onRecovered: () => {
+      if (chatError.value.startsWith('实时模型')) {
+        chatError.value = ''
+      }
     }
   })
 

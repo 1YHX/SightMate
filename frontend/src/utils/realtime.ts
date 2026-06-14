@@ -4,6 +4,7 @@ export type RealtimeClientOptions = {
   onAssistantTranscript?: (text: string) => void
   onAssistantDone?: (text: string) => void
   onError?: (message: string) => void
+  onRecovered?: () => void
 }
 
 const INPUT_SAMPLE_RATE = 16000
@@ -19,6 +20,7 @@ export class RealtimeClient {
   private playbackContext: AudioContext | null = null
   private nextPlaybackTime = 0
   private assistantText = ''
+  private hasSentAudio = false
 
   constructor(private readonly options: RealtimeClientOptions = {}) {}
 
@@ -61,9 +63,14 @@ export class RealtimeClient {
     this.playbackContext = null
     this.nextPlaybackTime = 0
     this.assistantText = ''
+    this.hasSentAudio = false
   }
 
   sendVideoFrame(dataUrl: string) {
+    if (!this.hasSentAudio) {
+      return
+    }
+
     const base64Image = dataUrl.split(',')[1]
     if (!base64Image || base64Image.length > 256 * 1024) {
       return
@@ -136,6 +143,7 @@ export class RealtimeClient {
         type: 'input_audio_buffer.append',
         audio: arrayBufferToBase64(pcm16.buffer)
       })
+      this.hasSentAudio = true
     }
 
     this.sourceNode.connect(this.scriptProcessor)
@@ -152,6 +160,7 @@ export class RealtimeClient {
         break
       case 'conversation.item.input_audio_transcription.completed':
         if (typeof message.transcript === 'string') {
+          this.options.onRecovered?.()
           this.options.onUserTranscript?.(message.transcript)
         }
         break
@@ -159,12 +168,14 @@ export class RealtimeClient {
         if (typeof message.text === 'string' || typeof message.stash === 'string') {
           const text = typeof message.text === 'string' ? message.text : ''
           const stash = typeof message.stash === 'string' ? message.stash : ''
+          this.options.onRecovered?.()
           this.options.onUserTranscript?.(`${text}${stash}`)
         }
         break
       case 'response.audio_transcript.delta':
         if (typeof message.delta === 'string') {
           this.assistantText += message.delta
+          this.options.onRecovered?.()
           this.options.onAssistantTranscript?.(this.assistantText)
         }
         break
@@ -172,16 +183,18 @@ export class RealtimeClient {
         if (typeof message.transcript === 'string') {
           this.assistantText = message.transcript
         }
+        this.options.onRecovered?.()
         this.options.onAssistantDone?.(this.assistantText)
         this.assistantText = ''
         break
       case 'response.audio.delta':
         if (typeof message.delta === 'string') {
+          this.options.onRecovered?.()
           this.playAudioDelta(message.delta)
         }
         break
       case 'error':
-        this.options.onError?.(String(message.message ?? '实时模型调用失败。'))
+        this.options.onError?.(getRealtimeErrorMessage(message))
         break
     }
   }
@@ -259,4 +272,27 @@ function base64ToInt16Array(base64: string) {
     bytes[index] = binary.charCodeAt(index)
   }
   return new Int16Array(bytes.buffer)
+}
+
+function getRealtimeErrorMessage(message: Record<string, unknown>) {
+  if (typeof message.message === 'string') {
+    return message.message
+  }
+
+  const error = message.error
+  if (isRecord(error)) {
+    if (typeof error.message === 'string') {
+      return error.message
+    }
+
+    if (typeof error.code === 'string') {
+      return `实时模型调用失败：${error.code}`
+    }
+  }
+
+  return '实时模型调用失败。'
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
