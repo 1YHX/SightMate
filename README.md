@@ -180,9 +180,3 @@ SightMate 已实现可运行的本地视频对话流程：
 - 回答优先使用阿里云 Qwen-TTS 播报。
 - 多轮对话按会话保存在 SQLite。
 - 左侧可查看、新建、删除和清空历史会话。
-
-## 注意事项
-
-- `backend/.env` 不会提交到 GitHub，真实 API Key 只保存在本地。
-- `backend/data/sightmate.sqlite3` 是本地数据库文件，不会提交到 GitHub。
-- 如果阿里云返回 `invalid_api_key`，需要在 `backend/.env` 中替换有效的百炼 API Key。
