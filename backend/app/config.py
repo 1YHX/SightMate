@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     aliyun_tts_base_url: str = "https://dashscope.aliyuncs.com/api/v1"
     aliyun_tts_model: str = "qwen3-tts-flash"
     aliyun_tts_voice: str = "Cherry"
+    aliyun_realtime_ws_url: str = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+    aliyun_realtime_model: str = "qwen3.5-omni-plus-realtime"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
     database_path: str = "data/sightmate.sqlite3"
