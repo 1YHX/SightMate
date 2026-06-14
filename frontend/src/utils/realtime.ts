@@ -101,7 +101,7 @@ export class RealtimeClient {
         modalities: ['text', 'audio'],
         input_audio_format: 'pcm',
         output_audio_format: 'pcm',
-        voice: 'Cherry',
+        voice: 'Tina',
         input_audio_transcription: {
           model: 'qwen3-asr-flash-realtime'
         },
