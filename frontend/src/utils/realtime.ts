@@ -292,12 +292,18 @@ function base64ToInt16Array(base64: string) {
 
 function getRealtimeErrorMessage(message: Record<string, unknown>) {
   if (typeof message.message === 'string') {
+    if (isRealtimePolicyError(message.message)) {
+      return '实时模型安全策略中断了本次连接，请换个问法或重新开始通话。'
+    }
     return message.message
   }
 
   const error = message.error
   if (isRecord(error)) {
     if (typeof error.message === 'string') {
+      if (isRealtimePolicyError(error.message)) {
+        return '实时模型安全策略中断了本次连接，请换个问法或重新开始通话。'
+      }
       return error.message
     }
 
@@ -316,4 +322,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isAppendImageBeforeAudioError(message: Record<string, unknown>) {
   const errorMessage = getRealtimeErrorMessage(message).toLowerCase()
   return errorMessage.includes('append image before append audio')
+}
+
+function isRealtimePolicyError(message: string) {
+  const normalizedMessage = message.toLowerCase()
+  return (
+    normalizedMessage.includes('1008') ||
+    normalizedMessage.includes('policy violation') ||
+    normalizedMessage.includes('inappropriate content')
+  )
 }
