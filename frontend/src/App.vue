@@ -21,6 +21,7 @@ import {
   stopSpeaking,
   type BrowserSpeechRecognition
 } from './utils/speech'
+import { RealtimeClient } from './utils/realtime'
 import { clearLocalChatHistory, loadLocalChatSessions } from './utils/storage'
 
 const projectName = 'SightMate'
@@ -36,6 +37,7 @@ const speechError = ref('')
 const canBrowserSpeak = isSpeechSynthesisSupported()
 const canSpeak = true
 const canContinuouslyListen = isSpeechRecognitionSupported()
+const canStartVideoConversation = Boolean(navigator.mediaDevices && 'getUserMedia' in navigator.mediaDevices && window.WebSocket)
 const chatSessions = ref<ChatSession[]>([])
 const isConversationMode = ref(false)
 const conversationRecognition = ref<BrowserSpeechRecognition | null>(null)
@@ -45,8 +47,13 @@ const pendingTranscript = ref('')
 const capturedFrameForCurrentTurn = ref<string | null>(null)
 const selectedSessionId = ref<string | undefined>(chatSessions.value[0]?.id)
 const professionalAudio = ref<HTMLAudioElement | null>(null)
+const realtimeClient = ref<RealtimeClient | null>(null)
+const isRealtimeMode = ref(false)
+const realtimeAssistantAnswer = ref('')
+const realtimeUserQuestion = ref('')
 let autoSubmitTimer: number | undefined
 let interruptionStartTimer: number | undefined
+let realtimeFrameTimer: number | undefined
 
 const visibleError = computed(() => captureError.value || chatError.value || speechError.value)
 const selectedSession = computed(() =>
@@ -325,14 +332,111 @@ async function startVideoConversation() {
     return
   }
 
-  startConversationMode()
+  try {
+    await startRealtimeConversation()
+  } catch (error) {
+    chatError.value = error instanceof Error ? error.message : '实时模式启动失败，已切换到按需视觉对话。'
+    startConversationMode()
+  }
 }
 
 function stopVideoConversation() {
+  stopRealtimeConversation()
   stopConversationMode()
   stopSpeaking()
   isSpeaking.value = false
   cameraViewRef.value?.stopCamera()
+}
+
+async function startRealtimeConversation() {
+  stopRealtimeConversation()
+  const client = new RealtimeClient({
+    onStatus: (status) => {
+      conversationStatus.value = status
+    },
+    onUserTranscript: (text) => {
+      realtimeUserQuestion.value = text
+      question.value = text
+    },
+    onAssistantTranscript: (text) => {
+      realtimeAssistantAnswer.value = text
+    },
+    onAssistantDone: (text) => {
+      if (text.trim()) {
+        void saveRealtimeTurn(text.trim())
+      }
+    },
+    onError: (message) => {
+      chatError.value = message
+    }
+  })
+
+  await client.start()
+  realtimeClient.value = client
+  isRealtimeMode.value = true
+  isConversationMode.value = true
+  conversationStatus.value = '实时聆听中'
+  startRealtimeFrameLoop()
+}
+
+function stopRealtimeConversation() {
+  realtimeClient.value?.stop()
+  realtimeClient.value = null
+  isRealtimeMode.value = false
+  realtimeAssistantAnswer.value = ''
+  realtimeUserQuestion.value = ''
+  clearRealtimeFrameTimer()
+}
+
+function startRealtimeFrameLoop() {
+  clearRealtimeFrameTimer()
+  realtimeFrameTimer = window.setInterval(() => {
+    try {
+      const frame = cameraViewRef.value?.captureRealtimeFrame()
+      if (frame) {
+        realtimeClient.value?.sendVideoFrame(frame)
+      }
+    } catch {
+      // The camera may not be ready for a frame yet.
+    }
+  }, 1000)
+}
+
+function clearRealtimeFrameTimer() {
+  if (realtimeFrameTimer) {
+    window.clearInterval(realtimeFrameTimer)
+    realtimeFrameTimer = undefined
+  }
+}
+
+async function saveRealtimeTurn(answer: string) {
+  const questionText = realtimeUserQuestion.value.trim() || '语音提问'
+  let frame = ''
+  try {
+    frame = cameraViewRef.value?.captureRealtimeFrame() ?? ''
+  } catch {
+    frame = ''
+  }
+  const turn: ChatTurn = {
+    id: crypto.randomUUID(),
+    question: questionText,
+    answer,
+    image_base64: frame,
+    model: 'qwen-omni-realtime',
+    created_at: new Date().toLocaleString('zh-CN', { hour12: false })
+  }
+  const targetSessionId = await ensureSelectedSession()
+  const updatedSession = await addChatTurn(targetSessionId, turn)
+  upsertSession(updatedSession)
+  selectedSessionId.value = updatedSession.id
+  latestAnswer.value = {
+    answer,
+    model: turn.model,
+    created_at: turn.created_at
+  }
+  realtimeUserQuestion.value = ''
+  realtimeAssistantAnswer.value = ''
+  await scrollChatToBottom()
 }
 
 function selectHistoryItem(id: string) {
@@ -365,7 +469,7 @@ async function scrollChatToBottom() {
 
 function startConversationMode() {
   if (!canContinuouslyListen) {
-    chatError.value = '当前浏览器不支持连续语音识别，请使用手动输入。'
+    chatError.value = '实时连接不可用，当前浏览器也不支持语音识别回退。'
     return
   }
 
@@ -386,6 +490,7 @@ function stopConversationMode() {
   clearAutoSubmitTimer()
   clearInterruptionStartTimer()
   stopInterruptionRecognition()
+  clearRealtimeFrameTimer()
   conversationRecognition.value?.abort()
   conversationRecognition.value = null
 }
@@ -406,7 +511,7 @@ function startConversationRecognition() {
   })
 
   if (!recognition) {
-    chatError.value = '当前浏览器不支持连续语音识别，请使用手动输入。'
+    chatError.value = '实时连接不可用，当前浏览器也不支持语音识别回退。'
     stopConversationMode()
     return
   }
@@ -474,7 +579,7 @@ function startConversationRecognition() {
     recognition.start()
   } catch {
     conversationRecognition.value = null
-    chatError.value = '连续语音识别启动失败，请重新开启。'
+    chatError.value = '语音识别回退启动失败，请重新开启通话。'
     stopConversationMode()
   }
 }
@@ -603,6 +708,7 @@ function resumeConversationIfNeeded() {
 }
 
 onBeforeUnmount(() => {
+  stopRealtimeConversation()
   stopConversationMode()
   clearAutoSubmitTimer()
   stopSpeaking()
@@ -618,7 +724,7 @@ onBeforeUnmount(() => {
         <h1>{{ projectName }}</h1>
       </div>
       <p class="privacy">
-        SightMate 不会持续上传视频流，仅在用户主动提问时截取当前画面。
+        实时模式会发送麦克风音频和低帧率压缩画面，API Key 仅保存在后端。
       </p>
     </header>
 
@@ -657,22 +763,30 @@ onBeforeUnmount(() => {
         <p v-if="!canBrowserSpeak" class="hint-message">
           当前浏览器不支持本地语音回退，将优先使用云端语音播报。
         </p>
+        <p v-if="!canContinuouslyListen" class="hint-message">
+          当前浏览器不支持旧版语音识别，实时模式仍可直接使用麦克风音频流。
+        </p>
 
         <div class="conversation-bar">
           <div>
             <p class="conversation-title">视频对话</p>
             <p class="conversation-status">
-              {{ isVideoConversationActive ? conversationStatus : '点击一次即可开启摄像头和连续语音' }}
+              {{ isVideoConversationActive ? conversationStatus : '点击一次即可开启摄像头、麦克风和实时模型' }}
             </p>
           </div>
           <button
             class="primary-button"
             type="button"
-            :disabled="!canContinuouslyListen"
+            :disabled="!canStartVideoConversation"
             @click="isVideoConversationActive ? stopVideoConversation() : startVideoConversation()"
           >
-            {{ isVideoConversationActive ? '结束视频对话' : '开始视频对话' }}
+            {{ isVideoConversationActive ? '结束通话' : '开始通话' }}
           </button>
+        </div>
+
+        <div v-if="isRealtimeMode && (realtimeUserQuestion || realtimeAssistantAnswer)" class="realtime-caption">
+          <p v-if="realtimeUserQuestion">你：{{ realtimeUserQuestion }}</p>
+          <p v-if="realtimeAssistantAnswer">SightMate：{{ realtimeAssistantAnswer }}</p>
         </div>
 
         <div
@@ -698,7 +812,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <p v-else class="empty-answer">点击开始视频对话后，直接说话提问，聊天记录会显示在这里。</p>
+        <p v-else class="empty-answer">点击开始通话后，直接说话提问，聊天记录会显示在这里。</p>
 
         <div v-if="latestAnswer" class="playback-bar">
           <button

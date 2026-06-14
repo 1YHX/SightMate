@@ -261,6 +261,23 @@ h2 {
   font-size: 14px;
 }
 
+.realtime-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid #d9e1ee;
+  border-radius: 8px;
+  background: #fbfdff;
+  color: #344054;
+  line-height: 1.5;
+}
+
+.realtime-caption p {
+  margin: 0;
+}
+
 .answer-meta {
   display: flex;
   flex-wrap: wrap;

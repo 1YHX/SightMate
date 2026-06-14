@@ -64,6 +64,17 @@ function captureFrame() {
   return captureVideoFrame(videoRef.value)
 }
 
+function captureRealtimeFrame() {
+  if (!stream.value || !videoRef.value) {
+    throw new Error('请先打开摄像头，再截取当前画面。')
+  }
+
+  return captureVideoFrame(videoRef.value, {
+    maxSize: 480,
+    quality: 0.55
+  })
+}
+
 function getCameraErrorMessage(error: unknown) {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
@@ -88,6 +99,7 @@ onBeforeUnmount(() => {
 
 defineExpose({
   captureFrame,
+  captureRealtimeFrame,
   startCamera,
   stopCamera,
   isCameraActive
@@ -124,6 +136,6 @@ defineExpose({
       {{ errorMessage }}
     </p>
 
-    <p class="hint-message">使用右侧的“开始视频对话”统一开启摄像头和连续语音。</p>
+    <p class="hint-message">使用右侧的“开始通话”统一开启摄像头、麦克风和实时模型。</p>
   </section>
 </template>
